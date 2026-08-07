@@ -105,10 +105,14 @@ export function buildOwnershipIndex(
           best = record;
           continue;
         }
-        // Prefer explicit source, then higher confidence.
-        const recordScore = SOURCE_PRIORITY[record.source] * 100 + CONFIDENCE_RANK[record.confidence];
-        const bestScore = SOURCE_PRIORITY[best.source] * 100 + CONFIDENCE_RANK[best.confidence];
-        if (recordScore > bestScore) best = record;
+        // Source priority wins (lower number = higher priority); ties are
+        // broken by higher confidence (spec §10, §11).
+        const bySource = SOURCE_PRIORITY[record.source] - SOURCE_PRIORITY[best.source];
+        if (bySource < 0) {
+          best = record;
+        } else if (bySource === 0) {
+          if (CONFIDENCE_RANK[record.confidence] > CONFIDENCE_RANK[best.confidence]) best = record;
+        }
       }
       if (!best) return null;
       return { owner: best.owner, source: best.source, confidence: best.confidence };

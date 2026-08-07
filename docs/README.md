@@ -43,6 +43,19 @@ Why NodeNet was built the way it was.
   external boundary.
 - [adr/003-graph-storage.md](adr/003-graph-storage.md) — local JSON files in
   `.nodenet/`.
+- [adr/004-github-integration.md](adr/004-github-integration.md) — GitHub
+  pull-request integration via REST + global fetch (zero new deps).
+- [adr/005-mcp-server.md](adr/005-mcp-server.md) — dependency-free MCP server
+  over stdio.
+- [adr/006-visualization.md](adr/006-visualization.md) — deterministic
+  community layout + interactive canvas viewer.
+
+## Integrations
+
+- **GitHub** — `nodenet github pr` analyzes a PR and can post the impact
+  comment and request reviewers. See [adr/004-github-integration.md](adr/004-github-integration.md).
+- **AI assistants (MCP)** — `nodenet mcp` exposes the graph, living context
+  and review resolution as MCP tools. See [adr/005-mcp-server.md](adr/005-mcp-server.md).
 
 ## Security
 

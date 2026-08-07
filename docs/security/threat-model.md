@@ -34,16 +34,19 @@ enumerates the threats the design defends against and the controls in place.
 | 14 | Secret leakage | secret-file patterns never scanned; `detectSecrets` on AI output; audit log excludes secrets |
 | 15 | Audit log pollution with secrets | audit entries contain identifiers/metadata only, never file contents |
 
-## Safe GitHub Actions (future)
+## Safe GitHub Actions
 
-When the GitHub Action ships (spec §21, §56):
+`nodenet github pr` ships the GitHub integration (spec §21, §56). Guidance
+for the GitHub Action wrapper (to be added in Phase 10):
 
 - Run NodeNet as its own step, not from PR-controlled code.
 - Use `pull_request` triggers with `contents: read` and `pull-requests: write`
   only. Never `contents: write`.
 - Never pass repository secrets to steps that read PR content.
-- Review-request automation must be gated on severity threshold, ownership
-  source, authority source and repository policy (spec §57).
+- The API token is read from `GITHUB_TOKEN` / `--token` and never logged.
+- Review-request automation is gated on *declared* reviewers only
+  (required + authority-required); git-history inference is never requested
+  automatically (spec §57).
 
 ## Out of scope for v0.1
 

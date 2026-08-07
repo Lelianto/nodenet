@@ -1,6 +1,6 @@
 {
-  "name": "nodenet",
-  "version": "0.1.0",
+  "name": "@antihero/nodenet",
+  "version": "0.3.0",
   "description": "NodeNet maps code, context, ownership, and authority into an explainable graph so humans and AI can safely understand the impact of software changes.",
   "keywords": [
     "graph",
@@ -15,6 +15,15 @@
     "ai-agents"
   ],
   "license": "Apache-2.0",
+  "author": "Lelianto Pradana",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lelianto/nodenet.git"
+  },
+  "homepage": "https://github.com/Lelianto/nodenet#readme",
+  "bugs": {
+    "url": "https://github.com/Lelianto/nodenet/issues"
+  },
   "type": "module",
   "bin": {
     "nodenet": "dist/cli/cli.js"

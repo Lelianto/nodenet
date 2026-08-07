@@ -1,0 +1,21 @@
+{
+  "ignore": ["dist", "build", "coverage", ".next", "out", "graph.html"],
+  "limits": {
+    "maxFileSizeBytes": 1048576,
+    "maxFiles": 10000,
+    "maxGraphNodes": 100000,
+    "maxGraphEdges": 300000
+  },
+  "reviewPolicy": { "LOW": "informational", "MEDIUM": "comment", "HIGH": "request", "CRITICAL": "approval" },
+  "contextFreshness": { "architecture": "180d", "security": "90d", "businessRule": "180d", "default": "180d" },
+  "ownership": {
+    "teams": {
+      "checkout-team": { "name": "Checkout Team", "members": ["alice"] },
+      "payment-team": { "name": "Payment Team", "members": ["bob"] },
+      "security-team": { "name": "Security Team", "members": ["carol"] },
+      "finance-team": { "name": "Finance Team", "members": ["dave"] }
+    },
+    "overrides": []
+  },
+  "developer": { "handle": "alice", "team": "checkout-team" }
+}

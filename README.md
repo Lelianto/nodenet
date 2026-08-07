@@ -124,8 +124,8 @@ unified, explainable model. Nothing ever leaves the machine.
 ## Installation
 
 ```bash
-# From npm (once published)
-npm install -g nodenet
+# From npm
+npm install -g @antihero/nodenet
 
 # Or from source
 git clone <your-fork> && cd nodenet
@@ -134,6 +134,20 @@ npm run build
 ```
 
 Then run it inside any repository you want to map.
+
+## Example project
+
+See [examples/payments-demo](examples/payments-demo) — a ready-made checkout →
+payment project with living context, ownership, authority and a cross-team PR
+scenario. It ships a pre-built interactive [graph.html](examples/payments-demo/.nodenet/graph.html)
+you can open in a browser, plus [README.md](examples/payments-demo/README.md) and
+`./demo.sh` to rebuild everything:
+
+```bash
+npm run build
+cd examples/payments-demo
+./demo.sh          # build, visualize, query, impact + reviewers
+```
 
 ## Quick start
 
@@ -194,8 +208,10 @@ the full option reference.
 | `reviewers [--base <ref>]` | Resolve reviewers (suggested / required / authorityRequired) |
 | `conflicts` | List conflicting living contexts |
 | `health` | Living context health report |
-| `graph [-o <file>]` | Generate a static HTML visualization (default `.nodenet/graph.html`) |
+| `graph [-o <file>] [-f html\|svg]` | Generate an interactive HTML viewer or static SVG image with communities (default `.nodenet/graph.html`) |
 | `doctor` | Validate config, graph and health |
+| `github pr [options]` | Analyze a PR; post the impact comment and/or request reviewers (GitHub) |
+| `mcp` | Run the MCP server over stdio for AI assistants |
 
 ## How governance is declared
 
@@ -301,9 +317,44 @@ matching and path safety.
 - **Phase 3 (done):** ownership — `owner`
 - **Phase 4 (done):** change impact — `impact` (symbol-level)
 - **Phase 5 (done):** review governance — `reviewers`
-- Phase 6: GitHub integration (PR comments, review requests)
-- Phase 7: AI integration (MSC output, MCP design)
-- Phase 8: richer visualization
+- **Phase 6 (done):** GitHub integration — `github pr` (comment, review requests)
+- **Phase 7 (done):** AI integration — MSC output + `mcp` server
+- **Phase 8 (done):** richer visualization — interactive force-directed graph with communities (`graph`)
+- Phase 9: multi-language parsing
+- Phase 10: GitHub Action wrapper + merge-block policy
+
+## GitHub pull-request integration
+
+`nodenet github pr` runs inside a GitHub Actions checkout of the PR head and
+produces the same deterministic impact + review report, optionally posting it:
+
+```bash
+nodenet github pr --repo owner/name --pr 42 --base main \
+  --comment --request-reviewers
+```
+
+- `--comment` posts the impact + reviewers comment to the PR.
+- `--request-reviewers` requests **declared** reviewers only (required +
+  authority-required) — git-history suggestions are never auto-requested.
+- Auth via `GITHUB_TOKEN` (least privilege: `contents: read`,
+  `pull-requests: write`); `GITHUB_REPOSITORY` / `GITHUB_REF` /
+  `GITHUB_BASE_REF` are read automatically in Actions.
+- Design: [docs/adr/004-github-integration.md](docs/adr/004-github-integration.md).
+
+## AI assistant integration (MCP)
+
+`nodenet mcp` runs a Model Context Protocol server over stdio, exposing the
+graph, living context, ownership, authority, impact and reviewers as tools for
+AI coding assistants (Claude Code, Codex, and any MCP client):
+
+```
+nodenet mcp
+```
+
+Tools: `query`, `related`, `trace`, `context` (Minimum Sufficient Context —
+secret-scanned), `explain`, `governed_by`, `owner`, `impact`, `reviewers`,
+`health`, `graph`. All results are deterministic and provenance-backed.
+Design: [docs/adr/005-mcp-server.md](docs/adr/005-mcp-server.md).
 
 ## License
 

@@ -51,12 +51,39 @@ export { saveGraph, loadGraph, appendAudit, loadSuppressions, dotNodenetDir } fr
 export type { AuditEntry } from "./storage/storage.js";
 
 export { renderGraphHtml } from "./visualization/html.js";
+export type { RenderOptions } from "./visualization/html.js";
+export { renderGraphSvg } from "./visualization/svg.js";
+export type { SvgOptions } from "./visualization/svg.js";
+export { detectCommunities } from "./visualization/communities.js";
+export type { CommunityId } from "./visualization/communities.js";
+export { layoutGraph } from "./visualization/layout.js";
+export type { Point, LayoutOptions } from "./visualization/layout.js";
 
 export { safeRelativePath, resolveSafe, readFileSafe } from "./security/filesystem.js";
 export type { SafeRelativePath } from "./security/filesystem.js";
 export { detectSecrets, containsSecrets, isSecretFilePath } from "./security/secrets.js";
 
 export { runCli } from "./cli/cli.js";
+
+export { analyzePr, runPrIntegration } from "./github/github.js";
+export type { PrAnalyzeOptions, PrAnalyzeResult, PrPostOptions, PrPostResult } from "./github/github.js";
+export { buildPrComment } from "./github/comment.js";
+export type { PrCommentOptions } from "./github/comment.js";
+export {
+  postIssueComment,
+  requestReviewers,
+  parseRepo,
+  resolvePullNumber,
+  resolveGitHubToken,
+  defaultApiUrl,
+  GitHubApiError,
+} from "./github/client.js";
+export type { GitHubClientConfig, GitHubComment, GitHubReviewRequest } from "./github/client.js";
+
+export { handleMcpLine, MCP_PROTOCOL_VERSION } from "./mcp/server.js";
+export type { McpContext, McpTool } from "./mcp/server.js";
+
+export type { AnalysisState } from "./types/analysis-state.js";
 
 export * from "./types/brand.js";
 export * from "./types/result.js";

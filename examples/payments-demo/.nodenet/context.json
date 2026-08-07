@@ -1,0 +1,71 @@
+[
+  {
+    "id": "PAYMENT-003",
+    "version": 1,
+    "title": "Settlement Processing Rule",
+    "description": "Settlement creation must be idempotent, validated, and auditable.",
+    "type": "domainRule",
+    "status": "ACTIVE",
+    "authority": "STANDARD",
+    "governanceClassification": "hardened-local",
+    "approvalRequired": true,
+    "appliesTo": ["src/payment/**"],
+    "owner": "payment-team",
+    "approvedBy": ["finance-team"],
+    "provenance": {
+      "source": "architecture-decision",
+      "sourcePath": "docs/adr/003-settlement.md",
+      "createdBy": "payment-team",
+      "createdAt": "2026-01-15T00:00:00.000Z",
+      "lastReviewedAt": "2026-06-01T00:00:00.000Z",
+      "kind": "USER_DECLARED",
+      "evidence": ["ADR-003", "INC-2024-011"]
+    }
+  },
+  {
+    "id": "SEC-009",
+    "version": 1,
+    "title": "PCI Payment Data Validation",
+    "description": "Payment data must be validated before processing; card data must never be logged.",
+    "type": "securityPolicy",
+    "status": "ACTIVE",
+    "authority": "HARDENED",
+    "governanceClassification": "hardened-standard",
+    "approvalRequired": true,
+    "appliesTo": ["src/payment/**", "src/api/**"],
+    "owner": "security-team",
+    "approvedBy": ["security-team"],
+    "provenance": {
+      "source": "security-standard",
+      "sourcePath": "standards/payment-security.md",
+      "createdBy": "security-team",
+      "createdAt": "2026-02-01T00:00:00.000Z",
+      "lastReviewedAt": "2026-06-01T00:00:00.000Z",
+      "kind": "EXTERNAL",
+      "evidence": ["PCI-DSS 6.5.1"]
+    }
+  },
+  {
+    "id": "COD-001",
+    "version": 1,
+    "title": "Explicit Error Handling",
+    "description": "All exported functions must throw typed errors; no silent failures.",
+    "type": "codingConvention",
+    "status": "ACTIVE",
+    "authority": "GUIDELINE",
+    "governanceClassification": "local-guideline",
+    "approvalRequired": false,
+    "appliesTo": ["src/checkout/**"],
+    "owner": "checkout-team",
+    "approvedBy": [],
+    "provenance": {
+      "source": "engineering-handbook",
+      "sourcePath": "handbook/conventions.md",
+      "createdBy": "checkout-team",
+      "createdAt": "2026-03-01T00:00:00.000Z",
+      "lastReviewedAt": "2026-06-01T00:00:00.000Z",
+      "kind": "USER_DECLARED",
+      "evidence": ["HANDBOOK-014"]
+    }
+  }
+]

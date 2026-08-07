@@ -1,0 +1,6 @@
+# NodeNet demo ownership — CODEOWNERS is a fallback source (rank 3),
+# after LCDD context metadata and .nodenet/ownership.json.
+src/payment/** @payment-team
+src/checkout/** @checkout-team
+src/security/** @security-team
+src/api/** @checkout-team

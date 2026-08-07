@@ -132,7 +132,18 @@ describe("nodenet CLI", () => {
     expect(result).toBe(0);
     const html = fs.readFileSync(out, "utf8");
     expect(html).toContain("<!doctype html>");
-    expect(html).toContain("Code layer");
+    expect(html).toContain('<canvas id="g"');
+    expect(html).toContain('var DATA =');
+  });
+
+  it("trace prints the full explainable chain", async () => {
+    const repo = work("cross-team");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const { output, result } = captureStdout(() => runCli(["trace", "CheckoutService", "createSettlement"], { cwd: repo }));
+    expect(await result).toBe(0);
+    const lines = output.split("\n").filter((l) => l.includes("-->"));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[lines.length - 1]).toContain("createSettlement()");
   });
 
   it("context propose does not modify active context", async () => {

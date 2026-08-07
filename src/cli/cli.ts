@@ -10,6 +10,7 @@
 import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
+import { createInterface } from "node:readline";
 
 import type { LoadedConfig } from "../config/config.js";
 import { loadConfig, writeConfigTemplate } from "../config/config.js";
@@ -35,12 +36,17 @@ import { resolveReviewers, type ReviewResolution } from "../review/resolver.js";
 import { computeHealth, type HealthReport } from "../health/health.js";
 import { buildContextBundle, type ContextBundle } from "../ai/context-builder.js";
 import { renderGraphHtml } from "../visualization/html.js";
+import { renderGraphSvg } from "../visualization/svg.js";
 import { safeRelativePath, type SafeRelativePath } from "../security/filesystem.js";
 import { errorMessage } from "../types/result.js";
 import { matchGlob } from "../utils/glob.js";
 import type { ContextRecord } from "../context/schema.js";
 import type { OwnershipIndex } from "../ownership/resolver.js";
 import type { ParsedSymbol, ParsedSymbolKind } from "../parser/typescript.js";
+import { runPrIntegration } from "../github/github.js";
+import { resolvePullNumber } from "../github/client.js";
+import { handleMcpLine, type McpContext } from "../mcp/server.js";
+import type { AnalysisState } from "../types/analysis-state.js";
 
 // ---------------------------------------------------------------------------
 // Shared plumbing
@@ -289,7 +295,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   program
     .name("nodenet")
     .description("NodeNet maps code, context, ownership, and authority into an explainable graph.")
-    .version("0.1.0");
+    .version("0.3.0");
 
   const withJson = (cmd: Command): Command => cmd.option("--json", "machine-readable JSON output");
 
@@ -486,9 +492,12 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           return;
         }
         process.stdout.write(humanNode(from) + "\n");
+        let current = from.id;
         for (const edge of chain) {
-          const other = graph.getNode(edge.from === from.id ? edge.to : edge.from);
-          process.stdout.write(`  --${edge.relation}--> ${other ? humanNode(other) : edge.to}\n`);
+          const next = edge.from === current ? edge.to : edge.from;
+          const nextNode = graph.getNode(next);
+          process.stdout.write(`  --${edge.relation}--> ${nextNode ? humanNode(nextNode) : next}\n`);
+          current = next;
         }
       }),
   );
@@ -736,14 +745,21 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   // -- graph ------------------------------------------------------------------
   program
     .command("graph")
-    .description("Generate a static HTML visualization")
+    .description("Generate an interactive HTML or static SVG visualization")
     .option("-o, --output <file>", "output file (default .nodenet/graph.html)")
-    .action((cmdOptions: { output?: string }) => {
+    .option("-f, --format <format>", "output format: html (interactive) or svg (static image)", "html")
+    .action((cmdOptions: { output?: string; format?: string }) => {
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config);
-      const out = cmdOptions.output ?? path.join(cwd, ".nodenet", "graph.html");
+      const format = cmdOptions.format ?? "html";
+      if (format !== "html" && format !== "svg") {
+        process.stdout.write(`Unknown format "${format}". Use html or svg.\n`);
+        return;
+      }
+      const out = cmdOptions.output ?? path.join(cwd, ".nodenet", format === "svg" ? "graph.svg" : "graph.html");
       fs.mkdirSync(path.dirname(out), { recursive: true });
-      fs.writeFileSync(out, renderGraphHtml(state.graph));
+      const content = format === "svg" ? renderGraphSvg(state.graph) : renderGraphHtml(state.graph);
+      fs.writeFileSync(out, content);
       process.stdout.write(`Graph written to ${out}\n`);
     });
 
@@ -758,6 +774,87 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       process.stdout.write(`config: ok (${state.warnings.length === 0 ? "no warnings" : state.warnings.length + " warnings"})\n`);
       process.stdout.write(`graph: ${state.graph.size} nodes, ${state.graph.edgeCount} edges\n`);
       printHealth(report);
+    });
+
+  // -- github pr --------------------------------------------------------------
+  withJson(
+    program
+      .command("github")
+      .description("GitHub pull-request integration")
+      .command("pr")
+      .description("Analyze a PR and optionally comment / request reviewers")
+      .option("-r, --repo <owner/name>", "repository, e.g. owner/name (or GITHUB_REPOSITORY)")
+      .option("-p, --pr <number>", "pull request number (or GITHUB_PR_NUMBER / GITHUB_REF)")
+      .option("-b, --base <ref>", "base branch (default: GITHUB_BASE_REF or main)")
+      .option("--comment", "post the impact + review comment to the PR")
+      .option("--request-reviewers", "request required/authority reviewers on the PR")
+      .option("--token <token>", "GitHub token (default: GITHUB_TOKEN)")
+      .action(async (cmdOptions: {
+        json?: boolean;
+        repo?: string;
+        pr?: string;
+        base?: string;
+        comment?: boolean;
+        requestReviewers?: boolean;
+        token?: string;
+      }) => {
+        const config = loadConfigChecked(cwd);
+        const state = loadForAnalysis(cwd, config) as AnalysisState;
+        const repo = cmdOptions.repo ?? process.env["GITHUB_REPOSITORY"];
+        if (!repo) {
+          process.stdout.write("Repository not provided. Pass --repo owner/name or set GITHUB_REPOSITORY.\n");
+          return;
+        }
+        const pr = resolvePullNumber(cmdOptions.pr);
+        const base = cmdOptions.base ?? process.env["GITHUB_BASE_REF"] ?? "main";
+        const result = await runPrIntegration(cwd, config, state, {
+          repo,
+          pr,
+          base,
+          comment: cmdOptions.comment ?? false,
+          requestReviewers: cmdOptions.requestReviewers ?? false,
+          ...(cmdOptions.token !== undefined ? { token: cmdOptions.token } : {}),
+          enforcePolicy: true,
+        });
+        if (!result.ok) {
+          process.stdout.write(`GitHub PR analysis failed: ${result.error.message}\n`);
+          return;
+        }
+        if (cmdOptions.json) {
+          printJson(
+            {
+              severity: result.value.impact.severity,
+              severityReasons: result.value.impact.severityReasons,
+              commentPosted: result.value.commentPosted,
+              requestedReviewers: result.value.requestedReviewers,
+              requestedTeams: result.value.requestedTeams,
+            },
+            true,
+          );
+          return;
+        }
+        process.stdout.write(result.value.comment + "\n");
+        if (result.value.commentPosted) process.stdout.write("Comment posted to the pull request.\n");
+        const requested = [...result.value.requestedReviewers, ...result.value.requestedTeams];
+        if (requested.length > 0) {
+          process.stdout.write(`Reviewers requested: ${requested.join(", ")}\n`);
+        }
+      }),
+  );
+
+  // -- mcp --------------------------------------------------------------------
+  program
+    .command("mcp")
+    .description("Run the MCP server over stdio (Model Context Protocol)")
+    .action(async () => {
+      const config = loadConfigChecked(cwd);
+      const state = loadForAnalysis(cwd, config) as AnalysisState;
+      const ctx: McpContext = { root: cwd, config, state };
+      const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+      for await (const line of rl) {
+        const response = handleMcpLine(ctx, line);
+        if (response !== null) process.stdout.write(response + "\n");
+      }
     });
 
   program.exitOverride();

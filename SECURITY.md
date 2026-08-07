@@ -23,8 +23,13 @@ source code, comments, configuration, git data, PR content.
 - **No prompt-injection execution.** Source comments are evidence, never
   instructions. AI context output marks sections by source and authority
   (spec §46, §47).
-- **Least-privilege design.** Future GitHub integration requests only the
-  permissions it needs (`contents: read`, `pull-requests: write`) (spec §56).
+- **Least-privilege GitHub integration** (`nodenet github pr`). Requests only
+  the permissions it needs: `contents: read`, `pull-requests: write` (spec
+  §56). Auth comes from `GITHUB_TOKEN` / `--token`; the token is never
+  logged, and requests go to the REST API with JSON bodies only — never
+  shell-concatenated. Review requests include *declared* reviewers only
+  (required + authority-required); git-history suggestions are never sent
+  automatically (spec §57).
 
 ## Plugin policy
 

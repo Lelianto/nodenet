@@ -2,6 +2,49 @@
 
 All notable changes to NodeNet are documented here.
 
+## [0.3.0] — 2026-08-07
+
+### Added
+
+- **Interactive visualization (Phase 8)**: `nodenet graph` now generates a
+  self-contained interactive HTML viewer — force-directed layout with
+  community clusters (label propagation), pan/zoom, hover-highlight, click to
+  inspect a node, search, and layer filters. Layout is deterministic and
+  computed at build time; zero new dependencies. A static **SVG export**
+  (`nodenet graph -f svg`) renders the same layout as an embeddable image.
+- **Example project**: `examples/payments-demo` — a checkout → payment demo
+  with living context, ownership, authority, a pre-built `graph.html`, and
+  `./demo.sh` covering query/trace/context/health plus a PR-style
+  `impact`/`reviewers` run.
+- **Docs**: ADR 006 (interactive visualization), README example section.
+
+### Fixed
+
+- **Ownership source priority was inverted** (`src/ownership/resolver.ts`):
+  the resolver scored `priority * 100 + confidence` and took the largest
+  value, which ranked CODEOWNERS above explicit `.nodenet/ownership.json` and
+  LCDD context ownership. Now LCDD context > NodeNet explicit > CODEOWNERS >
+  git-history, as specified (§10).
+- **`trace` display** printed each edge's source instead of its destination,
+  producing a duplicated hop; the full explainable chain is now shown.
+
+## [0.2.0] — 2026-08-07
+
+### Added
+
+- **GitHub integration (Phase 6)**: `nodenet github pr` — analyzes a PR diff,
+  builds a deterministic impact + review comment, and can post it and request
+  declared reviewers via the GitHub REST API (global fetch, zero new deps).
+  Least privilege (`contents: read`, `pull-requests: write`); token never
+  logged.
+- **AI integration (Phase 7)**: `nodenet mcp` — a dependency-free MCP server
+  over stdio exposing `query`, `related`, `trace`, `context` (MSC bundle),
+  `explain`, `governed_by`, `owner`, `impact`, `reviewers`, `health`, `graph`.
+  Tool arguments are Valibot-validated; tool failures return MCP `isError`
+  instead of crashing the server.
+- **Docs**: ADR 004 (GitHub integration), ADR 005 (MCP server design),
+  integration sections in README, updated threat model + SECURITY.
+
 ## [0.1.0] — 2026-08-07
 
 First reference implementation.

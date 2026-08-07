@@ -49,7 +49,9 @@ context + ownership from disk.
 | `src/health/` | Metrics derived strictly from graph state |
 | `src/ai/` | Minimum Sufficient Context bundle builder |
 | `src/storage/` | `.nodenet/` persistence, fingerprint index, symbol cache, audit log |
-| `src/visualization/` | Static self-contained HTML export |
+| `src/visualization/` | Interactive self-contained HTML export (force-directed layout, community detection, canvas viewer) |
+| `src/github/` | GitHub REST client (global fetch), PR comment builder, PR integration (`github pr`) |
+| `src/mcp/` | Dependency-free MCP server over stdio (graph + governance tools for AI assistants) |
 | `src/cli/` | All commands (spec §54) |
 
 ## Key design decisions

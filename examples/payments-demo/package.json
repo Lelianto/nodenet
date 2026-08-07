@@ -1,0 +1,7 @@
+{
+  "name": "payments-demo",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Example project used to demo NodeNet: a checkout → payment flow governed by living context."
+}
