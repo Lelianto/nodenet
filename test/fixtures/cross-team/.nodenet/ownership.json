@@ -1,0 +1,4 @@
+[
+  { "pattern": "src/payment/**", "owner": "payment-team", "source": "nodenet", "confidence": "AUTHORITATIVE" },
+  { "pattern": "src/checkout/**", "owner": "checkout-team", "source": "nodenet", "confidence": "AUTHORITATIVE" }
+]

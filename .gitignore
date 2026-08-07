@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Generated NodeNet data (committed .nodenet context/ownership files stay tracked)
+.nodenet/graph.json
+.nodenet/index.json
+.nodenet/metadata.json
+.nodenet/symbols.json
+.nodenet/audit.jsonl
+.nodenet/suppressions.json
+test/fixtures/**/.nodenet/graph.json
+test/fixtures/**/.nodenet/index.json
+test/fixtures/**/.nodenet/metadata.json
+test/fixtures/**/.nodenet/symbols.json
+test/fixtures/**/.nodenet/audit.jsonl
+test/fixtures/**/.nodenet/suppressions.json
+test/fixtures/**/dist/

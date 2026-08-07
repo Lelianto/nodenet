@@ -1,0 +1,13 @@
+{
+  "developer": {
+    "team": "checkout-team"
+  },
+  "ownership": {
+    "teams": {
+      "checkout-team": { "name": "Checkout Team" },
+      "payment-team": { "name": "Payment Team" },
+      "finance-team": { "name": "Finance Team" },
+      "security-team": { "name": "Security Team" }
+    }
+  }
+}

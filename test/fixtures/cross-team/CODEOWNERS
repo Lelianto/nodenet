@@ -1,0 +1,3 @@
+# Ownership
+@checkout-team src/checkout/
+@payment-team src/payment/

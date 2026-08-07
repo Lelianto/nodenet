@@ -1,0 +1,8 @@
+{
+  "name": "@mono/app",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@mono/core": "0.1.0"
+  }
+}
