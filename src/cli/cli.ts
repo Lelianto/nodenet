@@ -305,7 +305,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   program
     .name("nodenet")
     .description("NodeNet maps code, context, ownership, and authority into an explainable graph.")
-    .version("0.3.0");
+    .version("0.4.0");
 
   const withJson = (cmd: Command): Command => cmd.option("--json", "machine-readable JSON output");
 

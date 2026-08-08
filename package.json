@@ -1,6 +1,6 @@
 {
   "name": "@antihero/nodenet",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "NodeNet maps code, living context, ownership, and authority into an explainable graph — so humans and AI know what a change affects and who must review it. Deterministic, local-first, zero LLM/vector dependencies.",
   "keywords": [
     "graph",

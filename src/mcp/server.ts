@@ -33,7 +33,7 @@ import { safeRelativePath, type SafeRelativePath } from "../security/filesystem.
 import { evidenceClassForSource } from "../graph/edges.js";
 
 export const MCP_PROTOCOL_VERSION = "2024-11-05";
-export const MCP_SERVER_VERSION = "0.3.0";
+export const MCP_SERVER_VERSION = "0.4.0";
 
 // ---------------------------------------------------------------------------
 // Tool definitions

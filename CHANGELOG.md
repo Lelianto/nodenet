@@ -4,14 +4,59 @@ All notable changes to NodeNet are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-08
+
 ### Added
 
-- **`nodenet report` (Round 1 quick win)**: a deterministic, local-only
+- **LCDD 0.6.0 canonical registry support**: exact `@lcdd/core@0.6.0`
+  integration, `.lcdd/contexts/**/*.yaml` loading, lifecycle/enforcement
+  mapping, provenance retention, legacy context migration, and compatibility
+  tests.
+- **Governance Decision v1**: stable machine-readable `pass` / `warn` /
+  `block` outcomes with observe/warn/enforce rollout modes, required approvals,
+  ownership boundaries, and GitHub required-check workflow support.
+- **Graphify-style Governance Map**: Architecture, Governance, and Change
+  modes; community colors, semantic shapes, authority rings, change halos,
+  evidence inspector, filters, search, isolation, pan/zoom, and decision
+  overlay via `nodenet graph --change`.
+- **Ten-language parsing** with a public tiered adapter registry. Full:
+  TypeScript, JavaScript, Python, Go, Java, C#, PHP. Basic: Rust, Ruby,
+  Kotlin. `nodenet languages [--json]` exposes the exact capability contract.
+- **Deterministic artifact ingestion** for ADR Markdown, OpenAPI operations,
+  SQL tables, and Terraform resources.
+- **Incremental parse cache**: unchanged files reuse validated local parse
+  results during graph rebuilds.
+- **Multi-change collision triage**: `nodenet changes --base <ref> --refs ...`
+  identifies shared files, graph nodes, LCDD contexts, and ownership boundaries
+  across local branches.
+- **Shared HTTP MCP transport**: `nodenet serve`, loopback-first with optional
+  bearer authentication and bounded request bodies.
+- **Query-first agent installers** for Codex, Claude, Cursor, and generic Agent
+  Skills using reversible marked instruction blocks.
+- **Evidence taxonomy**: `EXTRACTED`, `DECLARED`, `INFERRED`, `AMBIGUOUS`, and
+  `OBSERVED` relationship classifications.
+- **`nodenet report`**: a deterministic, local-only
   highlights report — god nodes (highest-degree symbols with consumer counts),
   surprising connections (cross-community / far-file links), community summary,
   governance overview (contexts, authority, ownership/authority coverage) and
   suggested questions the graph is positioned to answer. Output as markdown or
   `--json`; also exposed as a `report` MCP tool. No LLM, no network.
+- **Language documentation and diagram** included in the npm package, plus a
+  per-language declaration/import contract test suite.
+
+### Changed
+
+- Minimum Node.js version is now 20; CI verifies Node 20 and 22.
+- The payments example now uses canonical LCDD YAML instead of the deprecated
+  `.nodenet/context.json` format.
+- The public graph model now persists method visibility and governance metadata.
+
+### Fixed
+
+- Persisted graphs now correctly restore every concrete living-context node
+  kind and its LCDD governance metadata.
+- Visualization fits nodes to the canvas and folds filesystem singleton
+  communities into their domain cluster.
 
 ## [0.3.0] — 2026-08-07
 
