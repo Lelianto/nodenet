@@ -4,6 +4,21 @@ All notable changes to NodeNet are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Decision-quality benchmark datasets and metrics for reviewer precision and
+  recall, false blocks, missed hardened impacts, outcome accuracy, and p50/p95
+  latency.
+- Deterministic decision identifiers with NodeNet/LCDD versions, append-only
+  decision audit events, and exact-ID emergency overrides requiring actor,
+  reason, and future expiry.
+- Idempotent GitHub Check Runs with annotations, transient-error retry,
+  `merge_group` support, and observe/warn/enforce conclusions.
+- `nodenet bootstrap [--github]` and an expanded `nodenet doctor [--json]`
+  readiness report for sub-15-minute repository activation.
+- A four-week design-partner playbook and explicit paid-pilot release gate for
+  organization/multi-repository product work.
+
 ## [0.4.0] — 2026-08-08
 
 ### Added

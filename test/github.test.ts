@@ -12,8 +12,10 @@ import {
   resolvePullNumber,
   resolveGitHubToken,
   postIssueComment,
+  upsertIssueComment,
   requestReviewers,
   GitHubApiError,
+  upsertCheckRun,
 } from "../src/github/client.js";
 import { makeGitRepo, buildFixtureState, fixtureRoot } from "./helpers.js";
 import type { ChangedHunk } from "../src/change/diff.js";
@@ -150,6 +152,21 @@ describe("GitHub client", () => {
     expect(JSON.parse(String(init.body))).toEqual({ body: "hello" });
   });
 
+  it("updates the existing marked NodeNet comment", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 17, body: "<!-- nodenet-governance --> old" }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    await upsertIssueComment(
+      { token: "t", apiUrl: "https://api.github.com" },
+      { owner: "acme", repo: "cart", issueNumber: 42, body: "<!-- nodenet-governance --> new" },
+      undefined,
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/issues/comments/17");
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("PATCH");
+  });
+
   it("requestReviewers splits users and teams", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -175,6 +192,20 @@ describe("GitHub client", () => {
         fetchMock as unknown as typeof fetch,
       ),
     ).rejects.toBeInstanceOf(GitHubApiError);
+  });
+
+  it("updates an existing check run idempotently", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ check_runs: [{ id: 99, name: "NodeNet Governance" }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    await upsertCheckRun(
+      { token: "t", apiUrl: "https://api.github.com" },
+      { owner: "acme", repo: "cart", headSha: "abc", name: "NodeNet Governance", conclusion: "success", title: "PASS", summary: "ok" },
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/check-runs/99");
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("PATCH");
   });
 });
 
@@ -221,11 +252,12 @@ describe("GitHub PR integration", () => {
     if (!result.ok) return;
     expect(result.value.commentPosted).toBe(true);
     expect(result.value.requestedReviewers).toContain("payment-team");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
 
     const urls = fetchMock.mock.calls.map((c) => String((c as unknown as [string])[0]));
-    expect(urls[0]).toContain("/issues/42/comments");
-    expect(urls[1]).toContain("/pulls/42/requested_reviewers");
+    expect(urls[0]).toContain("/issues/42/comments?per_page=100");
+    expect(urls[1]).toContain("/issues/42/comments");
+    expect(urls[2]).toContain("/pulls/42/requested_reviewers");
   });
 
   it("requires a token to post", async () => {

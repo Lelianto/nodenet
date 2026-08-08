@@ -2,9 +2,12 @@ name: NodeNet Governance
 
 on:
   pull_request:
+  merge_group:
 
 permissions:
   contents: read
+  checks: write
+  pull-requests: write
 
 jobs:
   governance:
@@ -37,7 +40,8 @@ jobs:
         run: >-
           node dist/cli/cli.js github pr
           --repo "${GITHUB_REPOSITORY}"
-          --pr "${GITHUB_PR_NUMBER}"
-          --base "origin/${GITHUB_BASE_REF}"
+          --base "origin/${GITHUB_BASE_REF:-main}"
           --mode enforce
+          --check
+          --sha "${GITHUB_SHA}"
           --json

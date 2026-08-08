@@ -25,7 +25,7 @@ security.
 | PR dashboard + merge-order conflict detection | ✅ local multi-ref `changes` | hosted dashboard |
 | Docs / markdown / ADR ingestion as graph nodes | ✅ ADR/OpenAPI/SQL/Terraform | richer cross-links |
 | Git hook auto-rebuild + graph.json merge driver | ❌ | ✅ |
-| Published benchmarks | ❌ | ✅ |
+| Decision benchmark harness | ✅ labeled metrics + CI-ready JSON | publish real pilot results |
 | README translations | 1 language | multiple |
 
 ## Round 1 — distribution & reach (low→medium effort, high impact)
@@ -61,15 +61,29 @@ security.
 
 ## Round 3 — the moat: exceed, don't copy
 
-9. **GitHub Action wrapper + merge-block policy (Phase 10)** — automatically
+9. **GitHub Action wrapper + merge-block policy (Phase 10, done)** — automatically
    flag or block a PR that changes code governed by HARDENED/MANDATORY context
    without the required approval. *The headline differentiator in CI.*
-10. **Published benchmarks (`BENCHMARKS.md`)** — evidence for impact-analysis
-    and reviewer-resolution accuracy vs. reasonable baselines.
+10. **Decision benchmarks (harness done; real results validation-gated)** —
+    labeled reviewer precision/recall, false-block, missed-impact, accuracy and
+    p50/p95 metrics. Publish results only after design-partner labeling.
 11. **VSCode extension** — hover a symbol to see owner, governed-by context,
     and change severity inline.
 12. **Governance AI-gating end-to-end** — Context Change Proposals that can be
     approved/rejected through a bot or UI, with the full audit trail.
+
+## Startup validation gate
+
+The local product now includes deterministic decision IDs, append-only audit
+events, expiring overrides, idempotent GitHub checks/comments, merge-queue
+support, `bootstrap`, readiness `doctor`, benchmark scoring, and a pilot
+playbook. The next work is evidence gathering with three design partners—not
+immediate SaaS breadth.
+
+Organization installation, multi-repository governance, centralized Contexts,
+identity mapping, audit/history UI, signed export, notifications, and billing
+remain gated until three partners use the loop weekly and two commit to a paid
+pilot.
 
 ## Strategy
 

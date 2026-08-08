@@ -17,6 +17,8 @@ This directory is the hub for all NodeNet documentation. Start with the
 | 8 | Review governance | [concepts/review-governance.md](concepts/review-governance.md) |
 | 9 | Security model | [security/threat-model.md](security/threat-model.md) |
 | 10 | Supported languages and usage | [languages.md](languages.md) |
+| 11 | Decision benchmarks and audited overrides | [decision-quality.md](decision-quality.md) |
+| 12 | Design-partner pilot operation | [design-partner-playbook.md](design-partner-playbook.md) |
 
 ## Concepts
 
@@ -36,6 +38,10 @@ Core mental model documents.
   reviewers are resolved with deduplicated, explainable reasons.
 - [languages.md](languages.md) — ten-language capability matrix, examples,
   tests, and CLI/MCP/API/visualization access paths.
+- [decision-quality.md](decision-quality.md) — labeled eval metrics, stable
+  decisions, audit events, and expiring emergency overrides.
+- [design-partner-playbook.md](design-partner-playbook.md) — four-week rollout,
+  weekly metrics, and the paid-pilot gate for organization features.
 
 ## Architecture decision records
 

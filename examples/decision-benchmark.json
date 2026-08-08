@@ -1,0 +1,22 @@
+[
+  {
+    "id": "hardened-payment-change",
+    "expectedOutcome": "block",
+    "actualOutcome": "block",
+    "expectedReviewers": ["payment-team", "security-team"],
+    "actualReviewers": ["payment-team", "security-team"],
+    "durationMs": 42,
+    "hardenedImpactExpected": true,
+    "hardenedImpactDetected": true
+  },
+  {
+    "id": "low-risk-local-change",
+    "expectedOutcome": "pass",
+    "actualOutcome": "pass",
+    "expectedReviewers": [],
+    "actualReviewers": [],
+    "durationMs": 18,
+    "hardenedImpactExpected": false,
+    "hardenedImpactDetected": false
+  }
+]

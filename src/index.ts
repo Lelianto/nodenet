@@ -98,6 +98,21 @@ export {
   GOVERNANCE_DECISION_SCHEMA_VERSION,
   GOVERNANCE_MODES,
 } from "./governance/decision.js";
+export {
+  appendDecisionAudit,
+  applyDecisionOverride,
+  decisionFingerprint,
+  isOverrideActive,
+  saveOverride,
+} from "./governance/audit.js";
+export type { DecisionAuditInput, DecisionOverride } from "./governance/audit.js";
+export { NODENET_VERSION } from "./version.js";
+export { loadBenchmarkCases, scoreBenchmark } from "./evaluation/benchmark.js";
+export type { BenchmarkMetrics, LabeledDecisionCase } from "./evaluation/benchmark.js";
+export { assessReadiness } from "./onboarding/readiness.js";
+export type { ReadinessCheck, ReadinessReport } from "./onboarding/readiness.js";
+export { bootstrapRepository } from "./onboarding/bootstrap.js";
+export type { BootstrapResult } from "./onboarding/bootstrap.js";
 export type {
   GovernanceDecision,
   GovernanceMode,
@@ -107,14 +122,16 @@ export type {
 } from "./governance/decision.js";
 export {
   postIssueComment,
+  upsertIssueComment,
   requestReviewers,
   parseRepo,
   resolvePullNumber,
   resolveGitHubToken,
   defaultApiUrl,
   GitHubApiError,
+  upsertCheckRun,
 } from "./github/client.js";
-export type { GitHubClientConfig, GitHubComment, GitHubReviewRequest } from "./github/client.js";
+export type { GitHubClientConfig, GitHubComment, GitHubReviewRequest, GitHubCheckRun } from "./github/client.js";
 
 export { handleMcpLine, MCP_PROTOCOL_VERSION } from "./mcp/server.js";
 export type { McpContext, McpTool } from "./mcp/server.js";

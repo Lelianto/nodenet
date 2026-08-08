@@ -7,6 +7,8 @@ import type { ImpactReport } from "../change/impact.js";
 import type { ReviewResolution } from "../review/resolver.js";
 import { isBlockingReview } from "../github/comment.js";
 import { effectiveEnforcementMode, isActiveContext } from "../context/lcdd.js";
+import { decisionFingerprint, type DecisionOverride } from "./audit.js";
+import { NODENET_VERSION } from "../version.js";
 
 export const GOVERNANCE_DECISION_SCHEMA_VERSION = "1" as const;
 export const GOVERNANCE_MODES = ["observe", "warn", "enforce"] as const;
@@ -33,7 +35,10 @@ export interface ApprovalRequirement {
 }
 
 export interface GovernanceDecision {
+  decisionId: string;
   schemaVersion: typeof GOVERNANCE_DECISION_SCHEMA_VERSION;
+  engineVersion: string;
+  lcddVersion: "0.6.0";
   mode: GovernanceMode;
   outcome: GovernanceOutcome;
   shouldFail: boolean;
@@ -44,6 +49,8 @@ export interface GovernanceDecision {
   affectedContexts: ContextEvidence[];
   ownershipBoundaries: ImpactReport["boundaries"];
   requiredApprovals: ApprovalRequirement[];
+  overridden: boolean;
+  override?: DecisionOverride;
 }
 
 export function isGovernanceMode(value: string): value is GovernanceMode {
@@ -84,8 +91,10 @@ export function buildGovernanceDecision(
     (a, b) => a.viaFile.localeCompare(b.viaFile) || a.toTeam.localeCompare(b.toTeam),
   );
 
-  return {
+  const decision: Omit<GovernanceDecision, "decisionId"> = {
     schemaVersion: GOVERNANCE_DECISION_SCHEMA_VERSION,
+    engineVersion: NODENET_VERSION,
+    lcddVersion: "0.6.0",
     mode,
     outcome,
     shouldFail: mode === "enforce" && outcome === "block",
@@ -110,5 +119,7 @@ export function buildGovernanceDecision(
       .sort((a, b) => a.id.localeCompare(b.id)),
     ownershipBoundaries,
     requiredApprovals,
+    overridden: false,
   };
+  return { decisionId: decisionFingerprint(decision), ...decision };
 }

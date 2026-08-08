@@ -22,7 +22,7 @@ export interface PrCommentOptions {
 
 /** Build the full PR comment body. */
 export function buildPrComment(impact: ImpactReport, review: ReviewResolution, opts: PrCommentOptions = {}): string {
-  const lines: string[] = [];
+  const lines: string[] = ["<!-- nodenet-governance -->"];
   lines.push("## NodeNet impact analysis");
   lines.push("");
   lines.push(`**Severity: ${impact.severity}**`);

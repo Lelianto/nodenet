@@ -11,6 +11,7 @@ coverage/
 **/.nodenet/metadata.json
 **/.nodenet/symbols.json
 **/.nodenet/audit.jsonl
+**/.nodenet/overrides.jsonl
 **/.nodenet/suppressions.json
 test/fixtures/**/dist/
 

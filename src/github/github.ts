@@ -26,9 +26,11 @@ import {
   parseRepo,
   resolveGitHubToken,
   defaultApiUrl,
-  postIssueComment,
+  upsertIssueComment,
   requestReviewers,
+  upsertCheckRun,
 } from "./client.js";
+import { appendDecisionAudit, applyDecisionOverride, saveOverride, type DecisionOverride } from "../governance/audit.js";
 import {
   buildGovernanceDecision,
   type GovernanceDecision,
@@ -74,17 +76,21 @@ export function analyzePr(
 
 export interface PrPostOptions extends PrAnalyzeOptions {
   repo: string;
-  pr: number;
+  pr?: number;
   comment?: boolean;
   requestReviewers?: boolean;
   token?: string;
   apiUrl?: string;
+  check?: boolean;
+  headSha?: string;
+  override?: DecisionOverride;
 }
 
 export interface PrPostResult extends PrAnalyzeResult {
   commentPosted: boolean;
   requestedReviewers: string[];
   requestedTeams: string[];
+  checkUpdated: boolean;
 }
 
 /**
@@ -107,7 +113,12 @@ export async function runPrIntegration(
     opts,
   );
   if (!analyzed.ok) return analyzed;
-  const { impact, review, decision, comment } = analyzed.value;
+  const { impact, review, comment } = analyzed.value;
+  let decision = analyzed.value.decision;
+  if (opts.override) {
+    decision = applyDecisionOverride(decision, opts.override);
+    saveOverride(root, opts.override);
+  }
 
   const result: PrPostResult = {
     impact,
@@ -117,9 +128,16 @@ export async function runPrIntegration(
     commentPosted: false,
     requestedReviewers: [],
     requestedTeams: [],
+    checkUpdated: false,
   };
 
-  const needsApi = opts.comment === true || opts.requestReviewers === true;
+  appendDecisionAudit(root, {
+    decision,
+    repository: opts.repo,
+    ...(opts.pr !== undefined ? { pullRequest: opts.pr } : {}),
+    ...(opts.override ? { override: opts.override } : {}),
+  });
+  const needsApi = opts.comment === true || opts.requestReviewers === true || opts.check === true;
   if (!needsApi) return ok(result);
 
   const token = opts.token ?? resolveGitHubToken();
@@ -130,11 +148,13 @@ export async function runPrIntegration(
   const client = { token, apiUrl: opts.apiUrl ?? defaultApiUrl() };
 
   if (opts.comment === true) {
-    await postIssueComment(client, { owner, repo, issueNumber: opts.pr, body: comment });
+    if (opts.pr === undefined) return err(new Error("A pull request number is required to post a comment."));
+    await upsertIssueComment(client, { owner, repo, issueNumber: opts.pr, body: comment });
     result.commentPosted = true;
   }
 
   if (opts.requestReviewers === true) {
+    if (opts.pr === undefined) return err(new Error("A pull request number is required to request reviewers."));
     // Declared reviewers only — required + authority-required. Suggested
     // (git-history inference) is never requested automatically (spec §57).
     const targets = [
@@ -155,6 +175,27 @@ export async function runPrIntegration(
     });
     result.requestedReviewers = reviewers;
     result.requestedTeams = teamReviewers;
+  }
+
+  if (opts.check === true) {
+    if (!opts.headSha) return err(new Error("A head SHA is required to update a GitHub check."));
+    await upsertCheckRun(client, {
+      owner,
+      repo,
+      headSha: opts.headSha,
+      name: "NodeNet Governance",
+      conclusion: decision.shouldFail ? "failure" : decision.outcome === "pass" ? "success" : "neutral",
+      title: `${decision.outcome.toUpperCase()} · ${decision.severity} · ${decision.mode}`,
+      summary: comment,
+      annotations: decision.changedFiles.slice(0, 50).map((file) => ({
+        path: file,
+        start_line: 1,
+        end_line: 1,
+        annotation_level: decision.shouldFail ? "failure" : decision.outcome === "warn" ? "warning" : "notice",
+        message: decision.reasons[0] ?? `NodeNet governance decision: ${decision.outcome}`,
+      })),
+    });
+    result.checkUpdated = true;
   }
 
   return ok(result);

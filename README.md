@@ -281,8 +281,10 @@ the full option reference.
 | `graph [-o <file>] [-f html\|svg]` | Generate an interactive HTML viewer or static SVG image with communities |
 | `languages [--json]` | Show the ten-language support tier and capability matrix |
 | `changes --base <ref> --refs <refs...>` | Compare local branches for graph, context, and ownership collisions |
-| `doctor` | Validate config, graph and health |
-| `github pr [options]` | Analyze a PR; post the impact comment and/or request reviewers |
+| `bootstrap [--github]` | Create starter config, canonical LCDD policy, and optional GitHub workflow without overwriting files |
+| `benchmark --dataset <file>` | Measure reviewer precision/recall, false blocks, missed impacts, accuracy, and p50/p95 latency |
+| `doctor [--json]` | Report a 0–100 activation-readiness score with remediation steps |
+| `github pr [options]` | Analyze a PR; update an idempotent Check Run, comment, request reviewers, and audit the decision |
 | `mcp` | Run the MCP server over stdio for AI assistants |
 | `serve [--host] [--port] [--token]` | Share MCP over loopback-first HTTP |
 | `install --platform <name>` | Install query-first guidance for Codex, Claude, Cursor, or Agent Skills |
@@ -376,7 +378,7 @@ produces the same deterministic impact + review report, optionally posting it:
 
 ```bash
 nodenet github pr --repo owner/name --pr 42 --base main \
-  --comment --request-reviewers --mode warn
+  --comment --request-reviewers --check --sha "$GITHUB_SHA" --mode warn
 ```
 
 - `--comment` posts the impact + reviewers comment to the PR.
@@ -385,8 +387,14 @@ nodenet github pr --repo owner/name --pr 42 --base main \
 - `--mode observe|warn|enforce` controls rollout. A blocking hardened/mandatory
   decision exits with code `2` only in `enforce` mode, so the command can be a
   required status check. `--json` emits the stable Governance Decision v1.
+- `--check --sha <commit>` creates or updates the named GitHub Check Run,
+  includes file annotations, retries transient API failures, and works for
+  `pull_request` and `merge_group` workflows.
+- Every execution records a source-free event in `.nodenet/audit.jsonl`.
+  Time-bounded emergency overrides require the exact decision ID, actor,
+  reason, and expiry; see [decision quality](docs/decision-quality.md).
 - Auth via `GITHUB_TOKEN` (least privilege: `contents: read`,
-  `pull-requests: write`); `GITHUB_REPOSITORY` / `GITHUB_REF` /
+  `checks: write`, `pull-requests: write`); `GITHUB_REPOSITORY` / `GITHUB_REF` /
   `GITHUB_BASE_REF` are read automatically in Actions.
 - Design: [docs/adr/004-github-integration.md](docs/adr/004-github-integration.md).
 
@@ -466,6 +474,10 @@ See [SECURITY.md](SECURITY.md) and
 - [SECURITY.md](SECURITY.md) — security guarantees and reporting
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
 - [CHANGELOG.md](CHANGELOG.md) — release history
+- [Decision quality and auditability](docs/decision-quality.md) — eval dataset,
+  metrics, decision audit, and bounded overrides
+- [Design-partner pilot playbook](docs/design-partner-playbook.md) — staged
+  rollout, weekly review, and validation gates
 
 ## Testing
 
@@ -488,13 +500,16 @@ Node 20 and 22.
 - **Phase 3 (done):** ownership — `owner`
 - **Phase 4 (done):** change impact — `impact` (symbol-level)
 - **Phase 5 (done):** review governance — `reviewers`
-- **Phase 6 (done):** GitHub integration — `github pr` (comment, review requests)
+- **Phase 6 (done):** production GitHub enforcement — idempotent Check Run,
+  annotations, retry, merge queue, rollout modes, comments, and review requests
 - **Phase 7 (done):** AI integration — MSC output + `mcp` server
 - **Phase 8 (done):** richer visualization — interactive force-directed graph with communities (`graph`, `graph -f svg`)
 - **Quick win (done):** highlights report — `report` (god nodes, surprising connections, communities, governance)
 - **Phase 9 (done):** ten-language parsing — seven full and three basic adapters
-- Phase 10: GitHub Action wrapper + merge-block policy
-- Phase 11: docs/PDF ingestion + richer AI (optional LLM backends)
+- **Phase 10 (done):** decision benchmark, audit events, expiring overrides,
+  readiness doctor, bootstrap wizard, and design-partner pilot kit
+- **Validation-gated:** organization installation, multi-repository governance,
+  centralized Contexts, identity mapping, audit/history UI, and billing
 
 The full prioritized development plan (gap audit, three rounds, recommended
 order) lives in [docs/roadmap.md](docs/roadmap.md).

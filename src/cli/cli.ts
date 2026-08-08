@@ -56,6 +56,10 @@ import { AGENT_PLATFORMS, installAgentGuidance, uninstallAgentGuidance, type Age
 import { startMcpHttpServer } from "../mcp/http.js";
 import { analyzeChangeCollisions } from "../change/collisions.js";
 import { languageSupportMatrix } from "../parser/registry.js";
+import { assessReadiness } from "../onboarding/readiness.js";
+import { bootstrapRepository } from "../onboarding/bootstrap.js";
+import { loadBenchmarkCases, scoreBenchmark } from "../evaluation/benchmark.js";
+import type { DecisionOverride } from "../governance/audit.js";
 
 // ---------------------------------------------------------------------------
 // Shared plumbing
@@ -862,14 +866,54 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   // -- doctor -----------------------------------------------------------------
   program
     .command("doctor")
-    .description("Validate configuration, graph and health")
-    .action(() => {
+    .description("Validate configuration, graph, governance readiness and health")
+    .option("--json", "emit machine-readable readiness JSON")
+    .action((cmdOptions: { json?: boolean }) => {
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config);
       const report = computeHealth(state.graph, state.contexts, state.ownership, config);
+      const readiness = assessReadiness(cwd, state);
+      if (cmdOptions.json) return printJson({ readiness, health: report, warnings: state.warnings }, true);
       process.stdout.write(`config: ok (${state.warnings.length === 0 ? "no warnings" : state.warnings.length + " warnings"})\n`);
       process.stdout.write(`graph: ${state.graph.size} nodes, ${state.graph.edgeCount} edges\n`);
+      process.stdout.write(`readiness: ${readiness.score}/100 (${readiness.ready ? "ready" : "needs attention"})\n`);
+      for (const check of readiness.checks) {
+        process.stdout.write(`  ${check.status.toUpperCase()} ${check.message}${check.action ? ` Next: ${check.action}` : ""}\n`);
+      }
       printHealth(report);
+    });
+
+  // -- bootstrap --------------------------------------------------------------
+  program
+    .command("bootstrap")
+    .description("Create a safe starter config, LCDD policy, and optional GitHub workflow")
+    .option("--github", "also install the GitHub governance workflow")
+    .option("--json", "emit machine-readable JSON")
+    .action((cmdOptions: { github?: boolean; json?: boolean }) => {
+      const result = bootstrapRepository(cwd, cmdOptions.github ?? false);
+      if (cmdOptions.json) return printJson(result, true);
+      for (const file of result.created) process.stdout.write(`created: ${file}\n`);
+      for (const file of result.skipped) process.stdout.write(`skipped (exists): ${file}\n`);
+      process.stdout.write("Next: nodenet build && nodenet doctor\n");
+    });
+
+  // -- benchmark --------------------------------------------------------------
+  program
+    .command("benchmark")
+    .description("Score a labeled decision dataset for quality and latency")
+    .requiredOption("--dataset <file>", "JSON dataset containing expected and actual decisions")
+    .option("--json", "emit machine-readable metrics")
+    .action((cmdOptions: { dataset: string; json?: boolean }) => {
+      const cases = loadBenchmarkCases(path.resolve(cwd, cmdOptions.dataset));
+      const metrics = scoreBenchmark(cases);
+      if (cmdOptions.json) return printJson(metrics, true);
+      process.stdout.write(`cases: ${metrics.cases}\n`);
+      process.stdout.write(`reviewer precision: ${(metrics.reviewerPrecision * 100).toFixed(1)}%\n`);
+      process.stdout.write(`reviewer recall: ${(metrics.reviewerRecall * 100).toFixed(1)}%\n`);
+      process.stdout.write(`false block rate: ${(metrics.falseBlockRate * 100).toFixed(1)}%\n`);
+      process.stdout.write(`missed impact rate: ${(metrics.missedImpactRate * 100).toFixed(1)}%\n`);
+      process.stdout.write(`outcome accuracy: ${(metrics.outcomeAccuracy * 100).toFixed(1)}%\n`);
+      process.stdout.write(`latency p50/p95: ${metrics.p50Ms}ms / ${metrics.p95Ms}ms\n`);
     });
 
   // -- github pr --------------------------------------------------------------
@@ -884,8 +928,14 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .option("-b, --base <ref>", "base branch (default: GITHUB_BASE_REF or main)")
       .option("--comment", "post the impact + review comment to the PR")
       .option("--request-reviewers", "request required/authority reviewers on the PR")
+      .option("--check", "create or update the NodeNet GitHub Check Run")
+      .option("--sha <sha>", "head commit SHA (or GITHUB_SHA)")
       .option("--mode <mode>", "governance rollout mode: observe, warn, or enforce", "warn")
       .option("--token <token>", "GitHub token (default: GITHUB_TOKEN)")
+      .option("--override-decision <id>", "override this exact deterministic decision ID")
+      .option("--override-actor <actor>", "identity authorizing the override")
+      .option("--override-reason <reason>", "required override justification")
+      .option("--override-expires <iso>", "required ISO-8601 override expiry")
       .action(async (cmdOptions: {
         json?: boolean;
         repo?: string;
@@ -893,8 +943,14 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         base?: string;
         comment?: boolean;
         requestReviewers?: boolean;
+        check?: boolean;
+        sha?: string;
         token?: string;
         mode?: string;
+        overrideDecision?: string;
+        overrideActor?: string;
+        overrideReason?: string;
+        overrideExpires?: string;
       }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config) as AnalysisState;
@@ -903,21 +959,39 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           process.stdout.write("Repository not provided. Pass --repo owner/name or set GITHUB_REPOSITORY.\n");
           return;
         }
-        const pr = resolvePullNumber(cmdOptions.pr);
+        let pr: number | undefined;
+        try { pr = resolvePullNumber(cmdOptions.pr); } catch {
+          if (cmdOptions.comment || cmdOptions.requestReviewers) throw new Error("A pull request number is required for comments or reviewer requests.");
+        }
         const base = cmdOptions.base ?? process.env["GITHUB_BASE_REF"] ?? "main";
         const mode = cmdOptions.mode ?? "warn";
         if (!isGovernanceMode(mode)) {
           throw new Error(`Invalid governance mode "${mode}". Use observe, warn, or enforce.`);
         }
+        let override: DecisionOverride | undefined;
+        const overrideValues = [cmdOptions.overrideDecision, cmdOptions.overrideActor, cmdOptions.overrideReason, cmdOptions.overrideExpires];
+        if (overrideValues.some(Boolean)) {
+          if (overrideValues.some((value) => !value)) throw new Error("Override requires --override-decision, --override-actor, --override-reason and --override-expires.");
+          override = {
+            decisionId: cmdOptions.overrideDecision ?? "",
+            actor: cmdOptions.overrideActor ?? "",
+            reason: cmdOptions.overrideReason ?? "",
+            createdAt: new Date().toISOString(),
+            expiresAt: cmdOptions.overrideExpires ?? "",
+          };
+        }
         const result = await runPrIntegration(cwd, config, state, {
           repo,
-          pr,
+          ...(pr !== undefined ? { pr } : {}),
           base,
           comment: cmdOptions.comment ?? false,
           requestReviewers: cmdOptions.requestReviewers ?? false,
           ...(cmdOptions.token !== undefined ? { token: cmdOptions.token } : {}),
           enforcePolicy: true,
           mode: mode as GovernanceMode,
+          check: cmdOptions.check ?? false,
+          ...((cmdOptions.sha ?? process.env["GITHUB_SHA"]) ? { headSha: cmdOptions.sha ?? process.env["GITHUB_SHA"] ?? "" } : {}),
+          ...(override ? { override } : {}),
         });
         if (!result.ok) {
           process.stdout.write(`GitHub PR analysis failed: ${result.error.message}\n`);
@@ -930,6 +1004,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
               commentPosted: result.value.commentPosted,
               requestedReviewers: result.value.requestedReviewers,
               requestedTeams: result.value.requestedTeams,
+              checkUpdated: result.value.checkUpdated,
             },
             true,
           );
