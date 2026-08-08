@@ -52,7 +52,7 @@ describe("MCP server protocol", () => {
     const res = send(ctx, JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list" }));
     const tools = res?.result?.tools as { name: string }[];
     expect(tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "health", "graph"]),
+      expect.arrayContaining(["query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "health", "graph", "report"]),
     );
   });
 

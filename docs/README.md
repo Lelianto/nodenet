@@ -67,6 +67,8 @@ Why NodeNet was built the way it was.
 
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — development workflow and conventions.
 - [CHANGELOG.md](../CHANGELOG.md) — release history.
+- [roadmap.md](roadmap.md) — the prioritized development plan (gap audit and
+  rounds).
 - [package.json](../package.json) — scripts, dependencies, metadata.
 
 ---

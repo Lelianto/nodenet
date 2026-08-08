@@ -136,6 +136,27 @@ describe("nodenet CLI", () => {
     expect(html).toContain('var DATA =');
   });
 
+  it("report emits a markdown highlights report", async () => {
+    const repo = work("cross-team");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const { output, result } = captureStdout(() => runCli(["report"], { cwd: repo }));
+    expect(await result).toBe(0);
+    expect(output).toContain("# NodeNet Report");
+    expect(output).toContain("## God nodes");
+    expect(output).toContain("## Governance");
+    expect(output).toContain("**Contexts:** 2");
+  });
+
+  it("report --json emits machine-readable output", async () => {
+    const repo = work("cross-team");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const { output, result } = captureStdout(() => runCli(["report", "--json"], { cwd: repo }));
+    expect(await result).toBe(0);
+    const parsed = JSON.parse(output);
+    expect(parsed.godNodes.length).toBeGreaterThan(0);
+    expect(parsed.summary.files).toBeGreaterThan(0);
+  });
+
   it("trace prints the full explainable chain", async () => {
     const repo = work("cross-team");
     expect(await runCli(["build"], { cwd: repo })).toBe(0);

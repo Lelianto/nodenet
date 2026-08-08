@@ -2,6 +2,17 @@
 
 All notable changes to NodeNet are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **`nodenet report` (Round 1 quick win)**: a deterministic, local-only
+  highlights report — god nodes (highest-degree symbols with consumer counts),
+  surprising connections (cross-community / far-file links), community summary,
+  governance overview (contexts, authority, ownership/authority coverage) and
+  suggested questions the graph is positioned to answer. Output as markdown or
+  `--json`; also exposed as a `report` MCP tool. No LLM, no network.
+
 ## [0.3.0] — 2026-08-07
 
 ### Added

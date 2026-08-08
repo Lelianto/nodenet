@@ -30,6 +30,16 @@ export type { Severity, SeverityInput } from "./review/severity.js";
 export { computeHealth } from "./health/health.js";
 export type { HealthReport } from "./health/health.js";
 
+export { buildReport, renderReportMarkdown } from "./report/report.js";
+export type {
+  GraphReport,
+  ReportGodNode,
+  ReportConnection,
+  ReportCommunity,
+  ReportGovernance,
+  ReportSuggestedQuestion,
+} from "./report/report.js";
+
 export { buildContextBundle } from "./ai/context-builder.js";
 export type { ContextBundle, BundleContextRef, BundleOwner, BundleGuidance } from "./ai/context-builder.js";
 

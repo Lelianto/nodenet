@@ -27,6 +27,7 @@ import { buildContextBundle } from "../ai/context-builder.js";
 import { analyzeImpact } from "../change/impact.js";
 import { resolveReviewers } from "../review/resolver.js";
 import { computeHealth } from "../health/health.js";
+import { buildReport, renderReportMarkdown } from "../report/report.js";
 import { matchGlob } from "../utils/glob.js";
 import { safeRelativePath, type SafeRelativePath } from "../security/filesystem.js";
 
@@ -263,6 +264,16 @@ function buildTools(ctx: McpContext): McpTool[] {
         const kindCounts: Record<string, number> = {};
         for (const node of graph.nodes()) kindCounts[node.kind] = (kindCounts[node.kind] ?? 0) + 1;
         return ok(json({ nodes: graph.size, edges: graph.edgeCount, contexts: contexts.length, kinds: kindCounts }));
+      },
+    },
+    {
+      name: "report",
+      description:
+        "Deterministic highlights report: god nodes (highest-degree symbols), surprising cross-community connections, community summary, governance overview, and suggested questions the graph can answer.",
+      inputSchema: schema({}, []),
+      run: () => {
+        const report = buildReport(graph, contexts, ownership, ctx.config);
+        return ok(renderReportMarkdown(report));
       },
     },
   ];

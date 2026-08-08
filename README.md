@@ -234,6 +234,7 @@ nodenet owner src/payment/PaymentService.ts
 nodenet context "modify payment settlement"   # AI context bundle
 nodenet impact --base main                    # analyze the current change
 nodenet reviewers --base main                 # who should review it
+nodenet report                                # highlights: god nodes, communities, governance
 nodenet health                                # context health report
 nodenet graph                                 # interactive HTML visualization
 nodenet graph -f svg -o graph.svg             # static SVG image
@@ -263,6 +264,7 @@ the full option reference.
 | `reviewers [--base <ref>]` | Resolve reviewers (suggested / required / authorityRequired) |
 | `conflicts` | List conflicting living contexts |
 | `health` | Living context health report |
+| `report` | Deterministic highlights report: god nodes, surprising connections, communities, governance, suggested questions |
 | `graph [-o <file>] [-f html\|svg]` | Generate an interactive HTML viewer or static SVG image with communities |
 | `doctor` | Validate config, graph and health |
 | `github pr [options]` | Analyze a PR; post the impact comment and/or request reviewers |
@@ -433,7 +435,7 @@ npm run typecheck
 npm test
 ```
 
-94 tests across 11 suites. Fixtures cover basic TypeScript, React, a monorepo,
+106 tests across 12 suites. Fixtures cover basic TypeScript, React, a monorepo,
 the cross-team MVP scenario, CODEOWNERS, circular dependencies, malformed
 source, and a malicious repository. Property-based tests cover lifecycle
 transitions, traversal termination, glob matching and path safety. CI runs on
@@ -449,9 +451,13 @@ Node 18, 20 and 22.
 - **Phase 6 (done):** GitHub integration — `github pr` (comment, review requests)
 - **Phase 7 (done):** AI integration — MSC output + `mcp` server
 - **Phase 8 (done):** richer visualization — interactive force-directed graph with communities (`graph`, `graph -f svg`)
+- **Quick win (done):** highlights report — `report` (god nodes, surprising connections, communities, governance)
 - Phase 9: multi-language parsing
 - Phase 10: GitHub Action wrapper + merge-block policy
 - Phase 11: docs/PDF ingestion + richer AI (optional LLM backends)
+
+The full prioritized development plan (gap audit, three rounds, recommended
+order) lives in [docs/roadmap.md](docs/roadmap.md).
 
 ## Troubleshooting & FAQ
 

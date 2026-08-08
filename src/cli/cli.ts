@@ -4,7 +4,7 @@
  *
  * Commands: init, build, update, watch, query, related, trace, context,
  * explain, owner, governed-by, impact, reviewers, conflicts, health,
- * graph, doctor. Machine-readable output via --json where appropriate.
+ * report, graph, doctor. Machine-readable output via --json where appropriate.
  */
 
 import { Command } from "commander";
@@ -46,6 +46,7 @@ import type { ParsedSymbol, ParsedSymbolKind } from "../parser/typescript.js";
 import { runPrIntegration } from "../github/github.js";
 import { resolvePullNumber } from "../github/client.js";
 import { handleMcpLine, type McpContext } from "../mcp/server.js";
+import { buildReport, renderReportMarkdown } from "../report/report.js";
 import type { AnalysisState } from "../types/analysis-state.js";
 
 // ---------------------------------------------------------------------------
@@ -739,6 +740,28 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           return;
         }
         printHealth(report);
+      }),
+  );
+
+  // -- report -----------------------------------------------------------------
+  withJson(
+    program
+      .command("report")
+      .description("Generate a deterministic highlights report: god nodes, surprising connections, communities, governance")
+      .option("--god-nodes <n>", "max god nodes to list", "10")
+      .option("--connections <n>", "max surprising connections to list", "10")
+      .action((cmdOptions: { json?: boolean; godNodes?: string; connections?: string }) => {
+        const config = loadConfigChecked(cwd);
+        const state = loadForAnalysis(cwd, config);
+        const report = buildReport(state.graph, state.contexts, state.ownership, config, new Date(), {
+          godNodes: Math.max(1, Number(cmdOptions.godNodes) || 10),
+          connections: Math.max(1, Number(cmdOptions.connections) || 10),
+        });
+        if (cmdOptions.json) {
+          printJson(report, true);
+          return;
+        }
+        process.stdout.write(renderReportMarkdown(report) + "\n");
       }),
   );
 
