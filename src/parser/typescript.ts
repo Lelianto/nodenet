@@ -17,7 +17,7 @@ import type { Result } from "../types/result.js";
 import { ok, err, errorMessage } from "../types/result.js";
 import type { Limits } from "../security/limits.js";
 
-export type Language = "typescript" | "tsx" | "javascript" | "jsx";
+export type Language = "typescript" | "tsx" | "javascript" | "jsx" | "python" | "go" | "java" | "rust" | "csharp" | "php" | "ruby" | "kotlin";
 
 export type ParsedSymbolKind =
   | "function"
@@ -94,7 +94,7 @@ export function isSupportedSource(p: SafeRelativePath): boolean {
 
 export function isTestFile(p: SafeRelativePath): boolean {
   const lower = p.toString().toLowerCase();
-  return /\.(test|spec)\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/.test(lower) || lower.includes("/__tests__/");
+  return /\.(test|spec)\.(ts|tsx|js|jsx|mts|cts|mjs|cjs)$/.test(lower) || /(^|\/)test_.*\.py$/.test(lower) || /_test\.go$/.test(lower) || /(?:test|tests)\.java$/.test(lower) || /_test\.rs$/.test(lower) || /(?:tests?|specs?)\.cs$/.test(lower) || /(?:test|spec)\.php$/.test(lower) || /_spec\.rb$/.test(lower) || /(?:test|spec)\.kt$/.test(lower) || lower.includes("/__tests__/");
 }
 
 export function isConfigFile(p: SafeRelativePath): boolean {

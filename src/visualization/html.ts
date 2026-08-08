@@ -16,6 +16,8 @@ import type { AuthorityLevel } from "../authority/authority.js";
 import { detectCommunities, type CommunityId } from "./communities.js";
 import { layoutGraph, type Point } from "./layout.js";
 
+export { renderGovernanceMap as renderGraphHtml } from "./governance-map.js";
+
 export interface RenderOptions {
   title?: string;
   /** Abstract layout viewport (default 1000x700). */
@@ -76,7 +78,7 @@ function layerOf(node: GraphNode): string {
   return "code";
 }
 
-export function renderGraphHtml(graph: Graph, options: RenderOptions = {}): string {
+export function renderGraphHtmlLegacy(graph: Graph, options: RenderOptions = {}): string {
   const title = options.title ?? "NodeNet Graph";
   const width = options.width ?? 1000;
   const height = options.height ?? 700;

@@ -109,9 +109,15 @@ describe("renderGraphHtml", () => {
     expect(html).toContain('var DATA =');
     expect(html).toContain('id="search"');
     expect(html).toContain('id="legend"');
-    expect(html).toContain('drag = pan');
+    expect(html).toContain('Drag to pan');
     expect(html).toContain('communities');
-    expect(html).toContain('(exact)');
+    expect(html).toContain('data-mode="architecture"');
+    expect(html).toContain('data-mode="governance"');
+    expect(html).toContain('data-mode="change"');
+    expect(html).toContain('NodeNet Governance Map');
+    expect(html).toContain('Evidence paths');
+    expect(html).toContain('No change set loaded · use graph --change');
+    expect(html).toContain('n.x/DATA.width');
     // No raw closing script inside the embedded JSON.
     expect(html).not.toContain("</script>}"); // would indicate an unescaped </script> in DATA
     expect(html.indexOf("</script>")).toBeGreaterThan(0);

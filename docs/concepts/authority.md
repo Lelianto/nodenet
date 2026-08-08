@@ -23,6 +23,11 @@ Change Proposal.
 `hardened-local` / `local-standard` → STANDARD, `local-guideline` → GUIDELINE,
 `local-experimental` → INFORMATIONAL.
 
+For canonical LCDD 0.6 Contexts, `authority.level` maps directly from `0`–`4`
+to INFORMATIONAL–MANDATORY. Classification remains a separate governance
+dimension, and merge behavior follows `enforcement.mode`, active lifecycle,
+and approval requirements.
+
 ## Human > AI (spec §22)
 
 AI agents can DISCOVER, ANALYZE, EXPLAIN, RECOMMEND, PROPOSE. They must not

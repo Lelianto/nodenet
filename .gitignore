@@ -13,3 +13,6 @@ coverage/
 **/.nodenet/audit.jsonl
 **/.nodenet/suppressions.json
 test/fixtures/**/dist/
+
+# Private planning documents (local only; never commit/publish)
+docs/private/

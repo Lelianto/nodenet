@@ -11,6 +11,7 @@ import type { ImpactReport } from "../change/impact.js";
 import type { ReviewResolution } from "../review/resolver.js";
 import { authorityRank } from "../authority/authority.js";
 import { isBlockingAuthority } from "../authority/authority.js";
+import { effectiveEnforcementMode, isActiveContext } from "../context/lcdd.js";
 
 export interface PrCommentOptions {
   /** Team of the change author, if known. */
@@ -67,7 +68,7 @@ export function buildPrComment(impact: ImpactReport, review: ReviewResolution, o
   }
   lines.push("");
 
-  if (opts.enforcePolicy && isBlocking(impact, review)) {
+  if (opts.enforcePolicy && isBlockingReview(impact, review)) {
     lines.push("> **Policy:** this change affects hardened/mandatory context and is **flagged** for approval before merge.");
     lines.push("");
   }
@@ -89,9 +90,12 @@ function appendGroup(lines: string[], title: string, items: ReviewResolution["re
   lines.push("");
 }
 
-function isBlocking(impact: ImpactReport, review: ReviewResolution): boolean {
+/** Whether the analyzed change requires hardened/mandatory authority approval. */
+export function isBlockingReview(impact: ImpactReport, review: ReviewResolution): boolean {
   if (review.authorityRequired.length === 0) return false;
   return impact.affectedContexts.some(
-    (ctx) => isBlockingAuthority(ctx.authority) || authorityRank(ctx.authority) >= 4,
+    (ctx) => isActiveContext(ctx) && ctx.approvalRequired &&
+      effectiveEnforcementMode(ctx) === "block" &&
+      (isBlockingAuthority(ctx.authority) || authorityRank(ctx.authority) >= 4),
   );
 }

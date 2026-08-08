@@ -1,0 +1,43 @@
+name: NodeNet Governance
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    name: NodeNet Governance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build NodeNet
+        run: npm run build
+
+      - name: Build repository graph
+        run: node dist/cli/cli.js build --json
+
+      - name: Evaluate governance
+        env:
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: >-
+          node dist/cli/cli.js github pr
+          --repo "${GITHUB_REPOSITORY}"
+          --pr "${GITHUB_PR_NUMBER}"
+          --base "origin/${GITHUB_BASE_REF}"
+          --mode enforce
+          --json

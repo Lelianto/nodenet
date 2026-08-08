@@ -36,6 +36,10 @@ export const CODE_NODE_KINDS = [
   "middleware",
   "test",
   "configuration",
+  "document",
+  "apiOperation",
+  "databaseTable",
+  "infrastructureResource",
 ] as const;
 export type CodeNodeKind = (typeof CODE_NODE_KINDS)[number];
 
@@ -115,6 +119,7 @@ export interface MethodNode extends NodeBase {
   path: SafeRelativePath;
   line: number;
   className: string;
+  exported: boolean;
 }
 
 export interface ClassNode extends NodeBase {
@@ -188,6 +193,13 @@ export interface ConfigurationNode extends NodeBase {
   path: SafeRelativePath;
 }
 
+export interface ArtifactNode extends NodeBase {
+  kind: "document" | "apiOperation" | "databaseTable" | "infrastructureResource";
+  path: SafeRelativePath;
+  line?: number;
+  artifactType: "adr" | "openapi" | "sql" | "terraform";
+}
+
 // ---------------------------------------------------------------------------
 // Context nodes
 // ---------------------------------------------------------------------------
@@ -198,6 +210,10 @@ export interface ContextNode extends NodeBase {
   status: ContextLifecycleStatus;
   authority: AuthorityLevel;
   type: ContextType;
+  governanceClassification?: string;
+  approvalRequired?: boolean;
+  enforcementMode?: "block" | "warn" | "comment" | "silent";
+  sourceFormat?: "lcdd-0.6" | "nodenet-legacy";
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +254,7 @@ export type GraphNode =
   | MiddlewareNode
   | TestNode
   | ConfigurationNode
+  | ArtifactNode
   | ContextNode
   | TeamNode
   | DeveloperNode
@@ -298,6 +315,11 @@ export function nodeLabel(node: GraphNode): string {
       return `test ${node.name} @ ${node.path}`;
     case "configuration":
       return `config ${node.name} @ ${node.path}`;
+    case "document":
+    case "apiOperation":
+    case "databaseTable":
+    case "infrastructureResource":
+      return `${node.kind} ${node.name} @ ${node.path}${node.line ? `:${node.line}` : ""}`;
     case "businessRule":
     case "architectureDecision":
     case "securityPolicy":

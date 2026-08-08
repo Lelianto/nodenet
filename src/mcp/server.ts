@@ -30,6 +30,7 @@ import { computeHealth } from "../health/health.js";
 import { buildReport, renderReportMarkdown } from "../report/report.js";
 import { matchGlob } from "../utils/glob.js";
 import { safeRelativePath, type SafeRelativePath } from "../security/filesystem.js";
+import { evidenceClassForSource } from "../graph/edges.js";
 
 export const MCP_PROTOCOL_VERSION = "2024-11-05";
 export const MCP_SERVER_VERSION = "0.3.0";
@@ -108,7 +109,7 @@ function describeNode(ctx: McpContext, name: string): string {
       const other = graph.getNode(otherId);
       const otherLabel = other ? nodeLabel(other) : otherId;
       const provenance = edge.provenance.source ?? "unknown";
-      lines.push(`- --${edge.relation}--> ${otherLabel} (source: ${provenance})`);
+      lines.push(`- --${edge.relation}--> ${otherLabel} (${edge.provenance.classification ?? evidenceClassForSource(edge.provenance.source)}, source: ${provenance})`);
     }
   }
   return lines.join("\n");
@@ -166,7 +167,7 @@ function buildTools(ctx: McpContext): McpTool[] {
         if (!node) return err(`No node matching "${name}".`);
         const related = neighbors(graph, node.id).map((r) => ({
           node: nodeRecord(r.node),
-          edges: r.edges.map((e) => ({ relation: e.relation, source: e.provenance.source })),
+          edges: r.edges.map((e) => ({ relation: e.relation, source: e.provenance.source, evidence: e.provenance.classification ?? evidenceClassForSource(e.provenance.source) })),
         }));
         return ok(json({ node: nodeRecord(node), related }));
       },

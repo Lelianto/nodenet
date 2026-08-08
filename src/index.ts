@@ -47,6 +47,13 @@ export { loadContexts } from "./context/loader.js";
 export { transitionContext, applyDecay, canTransition, allTransitions } from "./context/lifecycle.js";
 export type { TransitionAuditEvent } from "./context/lifecycle.js";
 export * from "./context/schema.js";
+export {
+  adaptLcddContext,
+  authorityFromLcddLevel,
+  effectiveEnforcementMode,
+  isActiveContext,
+  legacyToLcddContext,
+} from "./context/lcdd.js";
 
 export { buildOwnershipIndex, readCodeowners, gitHistorySuggestion } from "./ownership/resolver.js";
 export type { OwnershipIndex, OwnershipResolution } from "./ownership/resolver.js";
@@ -61,6 +68,10 @@ export { saveGraph, loadGraph, appendAudit, loadSuppressions, dotNodenetDir } fr
 export type { AuditEntry } from "./storage/storage.js";
 
 export { renderGraphHtml } from "./visualization/html.js";
+export { startMcpHttpServer, type McpHttpOptions, type McpHttpServer } from "./mcp/http.js";
+export { installAgentGuidance, uninstallAgentGuidance, AGENT_PLATFORMS, type AgentPlatform } from "./integration/installer.js";
+export { analyzeChangeCollisions, type CollisionReport, type ChangeCollision, type ChangeSetSummary } from "./change/collisions.js";
+export { registerLanguageAdapter, registeredLanguageAdapters, languageSupportMatrix, type LanguageAdapter, type LanguageSupportTier, type LanguageCapability } from "./parser/registry.js";
 export type { RenderOptions } from "./visualization/html.js";
 export { renderGraphSvg } from "./visualization/svg.js";
 export type { SvgOptions } from "./visualization/svg.js";
@@ -79,6 +90,21 @@ export { analyzePr, runPrIntegration } from "./github/github.js";
 export type { PrAnalyzeOptions, PrAnalyzeResult, PrPostOptions, PrPostResult } from "./github/github.js";
 export { buildPrComment } from "./github/comment.js";
 export type { PrCommentOptions } from "./github/comment.js";
+export { isBlockingReview } from "./github/comment.js";
+
+export {
+  buildGovernanceDecision,
+  isGovernanceMode,
+  GOVERNANCE_DECISION_SCHEMA_VERSION,
+  GOVERNANCE_MODES,
+} from "./governance/decision.js";
+export type {
+  GovernanceDecision,
+  GovernanceMode,
+  GovernanceOutcome,
+  ContextEvidence,
+  ApprovalRequirement,
+} from "./governance/decision.js";
 export {
   postIssueComment,
   requestReviewers,

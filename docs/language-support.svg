@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">NodeNet language support</title>
+  <desc id="desc">Seven fully supported web languages and three basic supported languages flow into one governance graph.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#070b14"/><stop offset="1" stop-color="#101a2a"/></linearGradient>
+    <linearGradient id="full" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <linearGradient id="basic" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#64748b"/><stop offset="1" stop-color="#334155"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity=".3"/></filter>
+  </defs>
+  <rect width="1200" height="520" rx="24" fill="url(#bg)"/>
+  <text x="56" y="64" fill="#e8edf7" font-family="Inter,system-ui,sans-serif" font-size="28" font-weight="700">NodeNet language support</text>
+  <text x="56" y="94" fill="#8491a8" font-family="Inter,system-ui,sans-serif" font-size="15">10 deterministic local adapters · one governance and change-impact graph</text>
+  <rect x="46" y="126" width="724" height="326" rx="18" fill="#0d1320" stroke="#253047"/>
+  <text x="70" y="166" fill="#7dd3fc" font-family="Inter,system-ui,sans-serif" font-size="14" font-weight="700">FULL SUPPORT · 7</text>
+  <g font-family="Inter,system-ui,sans-serif" font-size="17" font-weight="650" fill="white" filter="url(#shadow)">
+    <g transform="translate(70 192)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">TypeScript</text></g>
+    <g transform="translate(294 192)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">JavaScript</text></g>
+    <g transform="translate(518 192)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">Python</text></g>
+    <g transform="translate(70 272)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">Go</text></g>
+    <g transform="translate(294 272)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">Java</text></g>
+    <g transform="translate(518 272)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">C#</text></g>
+    <g transform="translate(294 352)"><rect width="208" height="64" rx="12" fill="url(#full)"/><text x="104" y="39" text-anchor="middle">PHP</text></g>
+  </g>
+  <rect x="794" y="126" width="360" height="326" rx="18" fill="#0d1320" stroke="#253047"/>
+  <text x="818" y="166" fill="#aab5c7" font-family="Inter,system-ui,sans-serif" font-size="14" font-weight="700">BASIC SUPPORT · 3</text>
+  <g font-family="Inter,system-ui,sans-serif" font-size="17" font-weight="650" fill="#e8edf7">
+    <g transform="translate(818 192)"><rect width="312" height="64" rx="12" fill="url(#basic)"/><text x="156" y="39" text-anchor="middle">Rust</text></g>
+    <g transform="translate(818 272)"><rect width="312" height="64" rx="12" fill="url(#basic)"/><text x="156" y="39" text-anchor="middle">Ruby</text></g>
+    <g transform="translate(818 352)"><rect width="312" height="64" rx="12" fill="url(#basic)"/><text x="156" y="39" text-anchor="middle">Kotlin</text></g>
+  </g>
+  <path d="M430 466v22h340v-22" fill="none" stroke="#38bdf8" stroke-width="2" opacity=".7"/>
+  <circle cx="600" cy="488" r="5" fill="#38bdf8"/>
+  <text x="600" y="510" text-anchor="middle" fill="#8491a8" font-family="Inter,system-ui,sans-serif" font-size="12">code → context → ownership → authority → change decision</text>
+</svg>

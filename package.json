@@ -8,6 +8,14 @@
     "knowledge-graph",
     "dependency-graph",
     "static-analysis",
+    "multi-language",
+    "typescript",
+    "javascript",
+    "python",
+    "golang",
+    "java",
+    "csharp",
+    "php",
     "ownership",
     "authority",
     "governance",
@@ -53,10 +61,13 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "docs/languages.md",
+    "docs/language-support.svg"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -66,6 +77,7 @@
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@lcdd/core": "0.6.0",
     "commander": "^12.1.0",
     "typescript": "^5.6.3",
     "valibot": "^1.0.0"

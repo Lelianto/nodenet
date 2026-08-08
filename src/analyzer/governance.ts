@@ -88,6 +88,10 @@ export function attachGovernanceLayers(
       status: ctx.status,
       authority: ctx.authority,
       type: ctx.type,
+      ...(ctx.governanceClassification !== undefined ? { governanceClassification: ctx.governanceClassification } : {}),
+      approvalRequired: ctx.approvalRequired,
+      ...(ctx.enforcementMode !== undefined ? { enforcementMode: ctx.enforcementMode } : {}),
+      ...(ctx.sourceFormat !== undefined ? { sourceFormat: ctx.sourceFormat } : {}),
     };
     graph.addNode(node);
 

@@ -13,6 +13,7 @@ import { readCodeowners, gitHistorySuggestion } from "../ownership/resolver.js";
 import type { ImpactReport } from "../change/impact.js";
 import type { LoadedConfig } from "../config/config.js";
 import { matchGlob } from "../utils/glob.js";
+import { isActiveContext } from "../context/lcdd.js";
 
 export interface Reviewer {
   target: string;
@@ -59,6 +60,7 @@ export function resolveReviewers(
 
   // 3. Context authority.
   for (const ctx of impact.affectedContexts) {
+    if (!isActiveContext(ctx)) continue;
     const authorityReason = `${ctx.id} (${ctx.title}) is ${ctx.authority}, status ${ctx.status}`;
     for (const approver of ctx.approvedBy) {
       push(authorityRequired, approver, `${ctx.id} requires approval from ${approver} (${authorityReason})`);
@@ -112,4 +114,3 @@ function toList(map: Map<string, string[]>): Reviewer[] {
     .map(([target, reasons]) => ({ target, reasons }))
     .sort((a, b) => a.target.localeCompare(b.target));
 }
-

@@ -17,7 +17,8 @@ import { ok, err } from "../types/result.js";
 import { brand, type NodeId, type EdgeId } from "../types/brand.js";
 import { safeRelativePath, dirnameSafe, basenameSafe, type SafeRelativePath } from "../security/filesystem.js";
 import { scanRepository, readScannedFile, type ScanEntry } from "../scanner/scanner.js";
-import { parseSourceFile, isSupportedSource, isTestFile, isConfigFile, type ParsedFile, type ParsedSymbol } from "../parser/typescript.js";
+import { isTestFile, isConfigFile, type ParsedFile, type ParsedSymbol } from "../parser/typescript.js";
+import { parseWithLanguageAdapter, supportedByLanguageAdapter } from "../parser/registry.js";
 import type { LoadedConfig } from "../config/config.js";
 import { Graph } from "../graph/graph.js";
 import type { GraphNode } from "../graph/nodes.js";
@@ -33,6 +34,8 @@ import {
   PackageNode,
 } from "../graph/nodes.js";
 import { type GraphEdge, type Relation, type EdgeProvenance } from "../graph/edges.js";
+import { loadParseCache, saveParseCache, type CachedParse } from "../parser/cache.js";
+import { attachRepositoryArtifacts } from "./artifacts.js";
 
 // ---------------------------------------------------------------------------
 // Index produced alongside the graph (used by impact analysis etc.)
@@ -54,6 +57,7 @@ export interface CodeBuildResult {
   graph: Graph;
   index: CodeGraphIndex;
   warnings: string[];
+  incremental: { parsed: number; reused: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -74,8 +78,12 @@ export function makeEdgeId(from: NodeId, relation: string, to: NodeId): EdgeId {
 // Build
 // ---------------------------------------------------------------------------
 
-export function buildCodeGraph(root: string, config: LoadedConfig): Result<CodeBuildResult, Error> {
+export function buildCodeGraph(root: string, config: LoadedConfig, options: { incrementalCache?: boolean } = {}): Result<CodeBuildResult, Error> {
   const warnings: string[] = [];
+  const previousParseCache = options.incrementalCache ? loadParseCache(root) : new Map<string, CachedParse>();
+  const nextParseCache = new Map<string, CachedParse>();
+  let parsedCount = 0;
+  let reusedCount = 0;
   const scan = scanRepository(root, config);
   if (!scan.ok) return err(scan.error);
   warnings.push(...scan.value.warnings);
@@ -149,7 +157,7 @@ export function buildCodeGraph(root: string, config: LoadedConfig): Result<CodeB
   for (const entry of scan.value.files) knownFiles.add(entry.relPath);
 
   for (const entry of scan.value.files) {
-    if (isConfigFile(entry.relPath) && !isSupportedSource(entry.relPath)) {
+    if (isConfigFile(entry.relPath) && !supportedByLanguageAdapter(entry.relPath)) {
       addConfigNode(graph, index, entry.relPath);
     }
   }
@@ -161,20 +169,30 @@ export function buildCodeGraph(root: string, config: LoadedConfig): Result<CodeB
   const pending: PendingFile[] = [];
 
   for (const entry of scan.value.files) {
-    if (isConfigFile(entry.relPath) && !isSupportedSource(entry.relPath)) continue;
-    if (!isSupportedSource(entry.relPath)) continue;
+    if (isConfigFile(entry.relPath) && !supportedByLanguageAdapter(entry.relPath)) continue;
+    if (!supportedByLanguageAdapter(entry.relPath)) continue;
 
-    const contentResult = readScannedFile(entry);
-    if (!contentResult.ok) {
-      warnings.push(`Cannot read ${entry.relPath.toString()}: ${contentResult.error.message}`);
-      continue;
+    const stat = fs.statSync(entry.absPath);
+    const cached = previousParseCache.get(entry.relPath.toString());
+    let parsed: ParsedFile;
+    if (cached && cached.size === entry.size && cached.mtimeMs === stat.mtimeMs) {
+      parsed = cached.parsed;
+      reusedCount++;
+    } else {
+      const contentResult = readScannedFile(entry);
+      if (!contentResult.ok) {
+        warnings.push(`Cannot read ${entry.relPath.toString()}: ${contentResult.error.message}`);
+        continue;
+      }
+      const parsedResult = parseWithLanguageAdapter(entry.relPath, contentResult.value, config.limits);
+      if (!parsedResult.ok) {
+        warnings.push(parsedResult.error.message);
+        continue;
+      }
+      parsed = parsedResult.value;
+      parsedCount++;
     }
-    const parsedResult = parseSourceFile(entry.relPath, contentResult.value, config.limits);
-    if (!parsedResult.ok) {
-      warnings.push(parsedResult.error.message);
-      continue;
-    }
-    const parsed = parsedResult.value;
+    nextParseCache.set(entry.relPath.toString(), { size: entry.size, mtimeMs: stat.mtimeMs, parsed });
     if (parsed.hasSyntaxErrors) {
       warnings.push(`File has syntax errors, parsed leniently: ${entry.relPath.toString()}`);
     }
@@ -272,7 +290,10 @@ export function buildCodeGraph(root: string, config: LoadedConfig): Result<CodeB
     }
   }
 
-  return ok({ graph, index, warnings });
+  attachRepositoryArtifacts(graph, scan.value.files);
+
+  if (options.incrementalCache) saveParseCache(root, nextParseCache);
+  return ok({ graph, index, warnings, incremental: { parsed: parsedCount, reused: reusedCount } });
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +437,7 @@ function symbolNode(symbol: ParsedSymbol, relPath: SafeRelativePath): GraphNode 
     case "function":
       return { kind: "function", id, ...base, exported: symbol.exported };
     case "method":
-      return { kind: "method", id, ...base, className: symbol.name.split(".")[0] ?? "" };
+      return { kind: "method", id, ...base, className: symbol.name.split(".")[0] ?? "", exported: symbol.exported };
     case "class":
       return { kind: "class", id, ...base, exported: symbol.exported };
     case "interface":
@@ -514,9 +535,18 @@ function resolveRelativeFile(
     `${base}.tsx`,
     `${base}.js`,
     `${base}.jsx`,
+    `${base}.py`,
+    `${base}.go`,
+    `${base}.java`,
+    `${base}.rs`,
+    `${base}.cs`,
+    `${base}.php`,
+    `${base}.rb`,
+    `${base}.kt`,
     `${base}/index.ts`,
     `${base}/index.tsx`,
     `${base}/index.js`,
+    `${base}/__init__.py`,
   ];
   for (const candidate of candidates) {
     const safe = safeRelativePath(candidate);

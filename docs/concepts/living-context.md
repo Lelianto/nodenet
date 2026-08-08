@@ -6,32 +6,32 @@ ticket, or a Slack message.
 
 ## The artifact
 
-Each context in `.nodenet/context.json` mirrors the LCDD Context Schema:
+Each Context in `.lcdd/contexts/**/*.yaml` uses the canonical LCDD 0.6.0
+Context Schema and is validated by `@lcdd/core@0.6.0`:
 
 - `id`, `version`, `title`, `description`
-- `type` — business rule, architecture decision, security policy, ...
-- `status` — the lifecycle stage
-- `authority` — how hard it is to change
-- `governanceClassification` — LCDD "governance by rate of change"
+- `category` — business rule, architecture decision, security policy, ...
+- `lifecycle` — the lifecycle stage
+- `authority.source` + `authority.level` — who establishes the constraint and
+  how hard it is to change
+- `governance.classification` — LCDD "governance by rate of change"
   (`hardened-mandate` → `hardened-local`, `local-experimental`)
-- `appliesTo` — which code it governs (globs)
-- `owner` + `approvedBy` — who governs it and who must approve changes
-- `provenance` — source, sourcePath, createdBy, createdAt, lastReviewedAt,
-  kind (FACT / INFERRED / DISCOVERED / USER_DECLARED / EXTERNAL / AI_PROPOSED),
-  evidence
+- `applies_to` — which code it governs (globs)
+- `owner` + `governance.approvers` — who governs it and who must approve changes
+- `source`, `evidence`, and trust metadata — provenance and authority evidence
+- `enforcement.mode` — `block`, `warn`, `comment`, or `silent`
 
 Inference is never silently promoted to fact (spec §7).
 
 ## Lifecycle (spec §6)
 
 ```
-DRAFT → CANDIDATE → APPROVED → ACTIVE → DEPRECATED → ARCHIVED
-                          ACTIVE → NEEDS_REVIEW → ACTIVE | DEPRECATED
+draft → candidate → approved → active → deprecated → archived
 ```
 
-Transitions are validated; `ACTIVE → DRAFT` fails unless `--force` (audited).
-Decay moves stale `ACTIVE` contexts to `NEEDS_REVIEW` — it never deletes or
-disables them (spec §26).
+LCDD owns canonical lifecycle transitions. NodeNet may derive a `NEEDS_REVIEW`
+health condition for stale Contexts, but it does not write that condition as a
+new LCDD lifecycle stage.
 
 ## Conflicting changes
 

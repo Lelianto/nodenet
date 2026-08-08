@@ -13,7 +13,7 @@ import type { Result } from "../types/result.js";
 import { ok, err, errorMessage, GraphBuildError } from "../types/result.js";
 import { Graph, type GraphSnapshot } from "../graph/graph.js";
 import { ALL_NODE_KINDS, type GraphNode } from "../graph/nodes.js";
-import { ALL_RELATIONS, type GraphEdge, type EdgeProvenance } from "../graph/edges.js";
+import { ALL_RELATIONS, EVIDENCE_CLASSES, evidenceClassForSource, type GraphEdge, type EdgeProvenance } from "../graph/edges.js";
 import type { Suppression } from "../config/config.js";
 import { matchGlob } from "../utils/glob.js";
 
@@ -140,7 +140,7 @@ function validateNode(raw: unknown): GraphNode | undefined {
     case "reactHook":
       return { ...base, kind, path: (n["path"] as string) ?? "", line: (n["line"] as number) ?? 0, exported: n["exported"] === true } as GraphNode;
     case "method":
-      return { ...base, kind, path: (n["path"] as string) ?? "", line: (n["line"] as number) ?? 0, className: (n["className"] as string) ?? "" } as GraphNode;
+      return { ...base, kind, path: (n["path"] as string) ?? "", line: (n["line"] as number) ?? 0, className: (n["className"] as string) ?? "", exported: n["exported"] === true } as GraphNode;
     case "apiRoute":
       return { ...base, kind, path: (n["path"] as string) ?? "", line: (n["line"] as number) ?? 0 } as GraphNode;
     case "middleware":
@@ -148,14 +148,34 @@ function validateNode(raw: unknown): GraphNode | undefined {
       return { ...base, kind, path: (n["path"] as string) ?? "" } as GraphNode;
     case "configuration":
       return { ...base, kind, path: (n["path"] as string) ?? "" } as GraphNode;
-    case "context":
+    case "document":
+    case "apiOperation":
+    case "databaseTable":
+    case "infrastructureResource":
+      return { ...base, kind, path: (n["path"] as string) ?? "", ...(typeof n["line"] === "number" ? { line: n["line"] } : {}), artifactType: (n["artifactType"] as "adr" | "openapi" | "sql" | "terraform") ?? "adr" } as GraphNode;
+    case "businessRule":
+    case "architectureDecision":
+    case "securityPolicy":
+    case "codingConvention":
+    case "requirement":
+    case "specification":
+    case "complianceRule":
+    case "operationalRule":
+    case "incidentLearning":
+    case "assumption":
+    case "domainRule":
+    case "externalConstraint":
       return {
         ...base,
-        kind: (n["type"] as GraphNode["kind"]) ?? kind,
+        kind,
         contextId: (n["contextId"] as string) ?? "",
         status: (n["status"] as string) ?? "ACTIVE",
         authority: (n["authority"] as string) ?? "GUIDELINE",
         type: (n["type"] as string) ?? "assumption",
+        ...(typeof n["governanceClassification"] === "string" ? { governanceClassification: n["governanceClassification"] } : {}),
+        ...(typeof n["approvalRequired"] === "boolean" ? { approvalRequired: n["approvalRequired"] } : {}),
+        ...(typeof n["enforcementMode"] === "string" ? { enforcementMode: n["enforcementMode"] } : {}),
+        ...(typeof n["sourceFormat"] === "string" ? { sourceFormat: n["sourceFormat"] } : {}),
       } as GraphNode;
     case "team":
       return { ...base, kind, teamId: (n["teamId"] as string) ?? "" } as GraphNode;
@@ -181,9 +201,16 @@ function validateEdge(raw: unknown): GraphEdge | undefined {
     return undefined;
   }
   const provenanceRaw = (e["provenance"] ?? {}) as Record<string, unknown>;
+  const source = (provenanceRaw["source"] as EdgeProvenance["source"]) ?? "ast";
+  const classification = typeof provenanceRaw["classification"] === "string" &&
+    (EVIDENCE_CLASSES as readonly string[]).includes(provenanceRaw["classification"])
+    ? provenanceRaw["classification"] as NonNullable<EdgeProvenance["classification"]>
+    : evidenceClassForSource(source);
   const provenance: EdgeProvenance = {
-    source: (provenanceRaw["source"] as EdgeProvenance["source"]) ?? "ast",
+    source,
+    classification,
     ...(typeof provenanceRaw["location"] === "string" ? { location: provenanceRaw["location"] } : {}),
+    ...(typeof provenanceRaw["rationale"] === "string" ? { rationale: provenanceRaw["rationale"] } : {}),
   };
   return {
     id: e["id"] as GraphEdge["id"],

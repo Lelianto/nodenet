@@ -36,6 +36,7 @@ import { resolveReviewers, type ReviewResolution } from "../review/resolver.js";
 import { computeHealth, type HealthReport } from "../health/health.js";
 import { buildContextBundle, type ContextBundle } from "../ai/context-builder.js";
 import { renderGraphHtml } from "../visualization/html.js";
+import type { GovernanceMapOptions } from "../visualization/governance-map.js";
 import { renderGraphSvg } from "../visualization/svg.js";
 import { safeRelativePath, type SafeRelativePath } from "../security/filesystem.js";
 import { errorMessage } from "../types/result.js";
@@ -48,6 +49,13 @@ import { resolvePullNumber } from "../github/client.js";
 import { handleMcpLine, type McpContext } from "../mcp/server.js";
 import { buildReport, renderReportMarkdown } from "../report/report.js";
 import type { AnalysisState } from "../types/analysis-state.js";
+import { buildGovernanceDecision, isGovernanceMode, type GovernanceMode } from "../governance/decision.js";
+import { legacyToLcddContext } from "../context/lcdd.js";
+import { FileRegistry, validateContextFull } from "@lcdd/core";
+import { AGENT_PLATFORMS, installAgentGuidance, uninstallAgentGuidance, type AgentPlatform } from "../integration/installer.js";
+import { startMcpHttpServer } from "../mcp/http.js";
+import { analyzeChangeCollisions } from "../change/collisions.js";
+import { languageSupportMatrix } from "../parser/registry.js";
 
 // ---------------------------------------------------------------------------
 // Shared plumbing
@@ -62,7 +70,7 @@ interface BuiltState {
 }
 
 function buildState(root: string, config: LoadedConfig): BuiltState {
-  const build = buildCodeGraph(root, config);
+  const build = buildCodeGraph(root, config, { incrementalCache: true });
   if (!build.ok) {
     throw new Error(`Graph build failed: ${build.error.message}`);
   }
@@ -292,6 +300,7 @@ function nodeToRecord(node: GraphNode): Record<string, unknown> {
 
 export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promise<number> {
   const cwd = path.resolve(opts.cwd ?? process.cwd());
+  let commandExitCode = 0;
   const program = new Command();
   program
     .name("nodenet")
@@ -363,7 +372,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         return;
       }
       process.stdout.write(
-        `Updated: ${changed.length} modified, ${added.length} added, ${removed.length} removed.\n`,
+        `Updated: ${changed.length} modified, ${added.length} added, ${removed.length} removed; unchanged parse results reused from local cache.\n`,
       );
       for (const p of changed) process.stdout.write(`  ~ ${p}\n`);
       for (const p of added) process.stdout.write(`  + ${p}\n`);
@@ -509,9 +518,40 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .command("context [target]")
       .description("List living contexts, or build an AI context bundle for a target")
       .option("--propose <id>", "record a Context Change Proposal (does NOT modify active context)")
-      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string }) => {
+      .option("--migrate", "preview migration of legacy contexts to the LCDD 0.6 Registry")
+      .option("--write", "write migration output (requires --migrate)")
+      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config);
+        if (cmdOptions.write && !cmdOptions.migrate) {
+          throw new Error("--write requires --migrate.");
+        }
+        if (cmdOptions.migrate) {
+          const legacy = state.contexts.filter((context) => context.sourceFormat !== "lcdd-0.6");
+          const canonical = legacy.map(legacyToLcddContext);
+          const invalid = canonical.flatMap((context) => {
+            const validation = validateContextFull(context);
+            return validation.valid ? [] : [{ id: context.id, errors: validation.errors }];
+          });
+          if (invalid.length > 0) {
+            throw new Error(`Cannot migrate invalid Contexts: ${invalid.map((item) => `${item.id}: ${item.errors.join("; ")}`).join(" | ")}`);
+          }
+          if (cmdOptions.write) {
+            const registry = new FileRegistry(cwd);
+            for (const context of canonical) registry.save(context);
+          }
+          const migration = {
+            version: "LCDD 0.6.0",
+            mode: cmdOptions.write ? "write" : "preview",
+            contexts: canonical.map((context) => ({ id: context.id, version: context.version, lifecycle: context.lifecycle })),
+          };
+          if (cmdOptions.json) printJson(migration, true);
+          else {
+            process.stdout.write(`${cmdOptions.write ? "Migrated" : "Would migrate"} ${canonical.length} Context(s) to .lcdd/contexts/.\n`);
+            if (!cmdOptions.write) process.stdout.write("Run with --migrate --write to persist the LCDD 0.6 artifacts.\n");
+          }
+          return;
+        }
         if (cmdOptions.propose) {
           const ctx = state.contexts.find((c) => c.id === cmdOptions.propose);
           if (!ctx) {
@@ -771,7 +811,9 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     .description("Generate an interactive HTML or static SVG visualization")
     .option("-o, --output <file>", "output file (default .nodenet/graph.html)")
     .option("-f, --format <format>", "output format: html (interactive) or svg (static image)", "html")
-    .action((cmdOptions: { output?: string; format?: string }) => {
+    .option("--change", "overlay the current git change impact and governance decision")
+    .option("-b, --base <ref>", "git base ref used with --change")
+    .action((cmdOptions: { output?: string; format?: string; change?: boolean; base?: string }) => {
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config);
       const format = cmdOptions.format ?? "html";
@@ -781,9 +823,40 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       }
       const out = cmdOptions.output ?? path.join(cwd, ".nodenet", format === "svg" ? "graph.svg" : "graph.html");
       fs.mkdirSync(path.dirname(out), { recursive: true });
-      const content = format === "svg" ? renderGraphSvg(state.graph) : renderGraphHtml(state.graph);
+      let change: GovernanceMapOptions["change"];
+      if (cmdOptions.change && format === "html") {
+        const impact = analyzeImpact(cwd, config, state.graph, state.index, state.ownership, state.contexts, {
+          ...(cmdOptions.base ? { base: cmdOptions.base } : {}),
+        });
+        if (!impact.ok) throw impact.error;
+        const review = resolveReviewers(cwd, config, impact.value);
+        change = {
+          decision: buildGovernanceDecision(impact.value, review, "warn"),
+          changedNodeIds: impact.value.changedSymbols.flatMap((symbol) => symbol.nodeId ? [symbol.nodeId] : []),
+          affectedNodeIds: impact.value.affectedNodeIds,
+        };
+      }
+      const content = format === "svg" ? renderGraphSvg(state.graph) : renderGraphHtml(state.graph, { ...(change ? { change } : {}) });
       fs.writeFileSync(out, content);
       process.stdout.write(`Graph written to ${out}\n`);
+    });
+
+  // -- changes ---------------------------------------------------------------
+  program
+    .command("changes")
+    .description("Compare local branches for code, context, and ownership collisions")
+    .requiredOption("--refs <refs...>", "two or more local branch/ref names")
+    .option("--base <ref>", "shared base branch", "main")
+    .option("--json", "emit machine-readable JSON")
+    .action((cmdOptions: { refs: string[]; base?: string; json?: boolean }) => {
+      if (cmdOptions.refs.length < 2) throw new Error("At least two refs are required.");
+      const config = loadConfigChecked(cwd);
+      const state = loadForAnalysis(cwd, config);
+      const report = analyzeChangeCollisions(cwd, cmdOptions.base ?? "main", cmdOptions.refs, state.graph, state.index, state.contexts, state.ownership);
+      if (cmdOptions.json) return printJson(report, true);
+      process.stdout.write(`Review order: ${report.reviewOrder.join(" → ")}\n`);
+      if (!report.collisions.length) process.stdout.write("No cross-change collisions found.\n");
+      for (const collision of report.collisions) process.stdout.write(`${collision.severity} ${collision.left} ↔ ${collision.right}: ${collision.reasons.join("; ")}\n`);
     });
 
   // -- doctor -----------------------------------------------------------------
@@ -811,6 +884,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .option("-b, --base <ref>", "base branch (default: GITHUB_BASE_REF or main)")
       .option("--comment", "post the impact + review comment to the PR")
       .option("--request-reviewers", "request required/authority reviewers on the PR")
+      .option("--mode <mode>", "governance rollout mode: observe, warn, or enforce", "warn")
       .option("--token <token>", "GitHub token (default: GITHUB_TOKEN)")
       .action(async (cmdOptions: {
         json?: boolean;
@@ -820,6 +894,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         comment?: boolean;
         requestReviewers?: boolean;
         token?: string;
+        mode?: string;
       }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config) as AnalysisState;
@@ -830,6 +905,10 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         }
         const pr = resolvePullNumber(cmdOptions.pr);
         const base = cmdOptions.base ?? process.env["GITHUB_BASE_REF"] ?? "main";
+        const mode = cmdOptions.mode ?? "warn";
+        if (!isGovernanceMode(mode)) {
+          throw new Error(`Invalid governance mode "${mode}". Use observe, warn, or enforce.`);
+        }
         const result = await runPrIntegration(cwd, config, state, {
           repo,
           pr,
@@ -838,6 +917,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           requestReviewers: cmdOptions.requestReviewers ?? false,
           ...(cmdOptions.token !== undefined ? { token: cmdOptions.token } : {}),
           enforcePolicy: true,
+          mode: mode as GovernanceMode,
         });
         if (!result.ok) {
           process.stdout.write(`GitHub PR analysis failed: ${result.error.message}\n`);
@@ -846,14 +926,14 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         if (cmdOptions.json) {
           printJson(
             {
-              severity: result.value.impact.severity,
-              severityReasons: result.value.impact.severityReasons,
+              decision: result.value.decision,
               commentPosted: result.value.commentPosted,
               requestedReviewers: result.value.requestedReviewers,
               requestedTeams: result.value.requestedTeams,
             },
             true,
           );
+          if (result.value.decision.shouldFail) commandExitCode = 2;
           return;
         }
         process.stdout.write(result.value.comment + "\n");
@@ -862,6 +942,8 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         if (requested.length > 0) {
           process.stdout.write(`Reviewers requested: ${requested.join(", ")}\n`);
         }
+        process.stdout.write(`Governance decision: ${result.value.decision.outcome.toUpperCase()} (${result.value.decision.mode})\n`);
+        if (result.value.decision.shouldFail) commandExitCode = 2;
       }),
   );
 
@@ -880,11 +962,73 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       }
     });
 
+  // -- serve ------------------------------------------------------------------
+  program
+    .command("serve")
+    .description("Serve the MCP graph over local HTTP for multiple agents")
+    .option("--host <host>", "bind host; loopback is the safe default", "127.0.0.1")
+    .option("--port <port>", "bind port", "7341")
+    .option("--token <token>", "optional bearer token")
+    .action(async (cmdOptions: { host?: string; port?: string; token?: string }) => {
+      const config = loadConfigChecked(cwd);
+      const state = loadForAnalysis(cwd, config) as AnalysisState;
+      const port = Number(cmdOptions.port ?? "7341");
+      if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Port must be an integer from 0 to 65535.");
+      const host = cmdOptions.host ?? "127.0.0.1";
+      if (host !== "127.0.0.1" && host !== "::1" && !cmdOptions.token) {
+        throw new Error("A bearer token is required when binding beyond loopback.");
+      }
+      const server = await startMcpHttpServer({ root: cwd, config, state }, {
+        host,
+        port,
+        ...(cmdOptions.token ? { token: cmdOptions.token } : {}),
+      });
+      process.stdout.write(`NodeNet MCP listening at ${server.url}/mcp\n`);
+      await new Promise<void>((resolve) => {
+        const stop = () => void server.close().then(resolve);
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      });
+    });
+
+  // -- install / uninstall ----------------------------------------------------
+  program
+    .command("languages")
+    .description("Show built-in language support tiers and extraction capabilities")
+    .option("--json", "emit machine-readable JSON")
+    .action((cmdOptions: { json?: boolean }) => {
+      const matrix = languageSupportMatrix();
+      if (cmdOptions.json) return printJson(matrix, true);
+      for (const item of matrix) process.stdout.write(`${item.tier.toUpperCase().padEnd(5)} ${item.language.padEnd(12)} ${item.capabilities.join(", ")}\n`);
+    });
+
+  program
+    .command("install")
+    .description("Install project-local query-first guidance for a coding agent")
+    .requiredOption("--platform <platform>", `platform: ${AGENT_PLATFORMS.join(", ")}`)
+    .action((cmdOptions: { platform: string }) => {
+      if (!AGENT_PLATFORMS.includes(cmdOptions.platform as AgentPlatform)) throw new Error(`Unknown platform: ${cmdOptions.platform}`);
+      const result = installAgentGuidance(cwd, cmdOptions.platform as AgentPlatform);
+      if (!result.ok) throw result.error;
+      process.stdout.write(`NodeNet guidance installed in ${result.value}\n`);
+    });
+
+  program
+    .command("uninstall")
+    .description("Remove project-local NodeNet agent guidance")
+    .requiredOption("--platform <platform>", `platform: ${AGENT_PLATFORMS.join(", ")}`)
+    .action((cmdOptions: { platform: string }) => {
+      if (!AGENT_PLATFORMS.includes(cmdOptions.platform as AgentPlatform)) throw new Error(`Unknown platform: ${cmdOptions.platform}`);
+      const result = uninstallAgentGuidance(cwd, cmdOptions.platform as AgentPlatform);
+      if (!result.ok) throw result.error;
+      process.stdout.write(`NodeNet guidance removed from ${result.value}\n`);
+    });
+
   program.exitOverride();
 
   try {
     await program.parseAsync(argv, { from: "user" });
-    return 0;
+    return commandExitCode;
   } catch (e) {
     // help/version output is not an error
     if (typeof e === "object" && e !== null && "exitCode" in e && (e as { exitCode: number }).exitCode === 0) {

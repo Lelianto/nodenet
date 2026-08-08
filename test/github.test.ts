@@ -5,6 +5,7 @@ import { analyzeImpact } from "../src/change/impact.js";
 import { resolveReviewers } from "../src/review/resolver.js";
 import { safeRelativePath } from "../src/security/filesystem.js";
 import { buildPrComment } from "../src/github/comment.js";
+import { buildGovernanceDecision } from "../src/governance/decision.js";
 import { analyzePr, runPrIntegration } from "../src/github/github.js";
 import {
   parseRepo,
@@ -72,6 +73,45 @@ describe("buildPrComment", () => {
     const comment = buildPrComment(impact.value, review, { enforcePolicy: true });
     expect(comment).toContain("SEC-009");
     expect(comment).toContain("Policy");
+  });
+});
+
+describe("Governance Decision v1", () => {
+  it("blocks hardened changes and only fails in enforce mode", () => {
+    const root = fixtureRoot("cross-team");
+    const state = buildFixtureState(root);
+    const impact = analyzeImpact(root, state.config, state.graph, state.index, state.ownership, state.contexts, {
+      changes: [hunk("src/payment/PaymentService.ts", [2])],
+      developerTeam: "checkout-team",
+    });
+    expect(impact.ok).toBe(true);
+    if (!impact.ok) return;
+    const review = resolveReviewers(root, state.config, impact.value);
+
+    const warn = buildGovernanceDecision(impact.value, review, "warn");
+    const enforce = buildGovernanceDecision(impact.value, review, "enforce");
+
+    expect(warn.schemaVersion).toBe("1");
+    expect(warn.outcome).toBe("block");
+    expect(warn.shouldFail).toBe(false);
+    expect(enforce.shouldFail).toBe(true);
+    expect(enforce.affectedContexts.map((context) => context.id)).toContain("SEC-009");
+    expect(enforce.requiredApprovals.map((approval) => approval.target)).toContain("security-team");
+    expect(new Set(enforce.ownershipBoundaries.map((boundary) =>
+      `${boundary.fromTeam}:${boundary.toTeam}:${boundary.viaFile}`,
+    )).size).toBe(enforce.ownershipBoundaries.length);
+  });
+
+  it("passes a low-risk internal change", () => {
+    const root = fixtureRoot("basic-typescript");
+    const state = buildFixtureState(root);
+    const impact = analyzeImpact(root, state.config, state.graph, state.index, state.ownership, state.contexts, {
+      changes: [hunk("src/math.ts", [1])],
+    });
+    expect(impact.ok).toBe(true);
+    if (!impact.ok) return;
+    const review = resolveReviewers(root, state.config, impact.value);
+    expect(buildGovernanceDecision(impact.value, review, "enforce").outcome).toBe("pass");
   });
 });
 

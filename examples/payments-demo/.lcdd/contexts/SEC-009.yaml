@@ -1,0 +1,36 @@
+id: SEC-009
+version: 1
+created_at: '2026-02-01T00:00:00.000Z'
+updated_at: '2026-08-08T14:16:09.928Z'
+title: PCI Payment Data Validation
+description: Payment data must be validated before processing; card data must never be logged.
+source:
+  type: documentation
+  location: standards/payment-security.md
+  extraction_method: unknown
+authority:
+  source:
+    type: organization
+    id: security-team
+    name: security-team
+  level: 3
+  trust_model: direct
+category: securityPolicy
+applies_to:
+  - src/payment/**
+  - src/api/**
+lifecycle: active
+governance:
+  classification: hardened-standard
+  approval_required: true
+  approvers:
+    - security-team
+effective_date: '2026-02-01T00:00:00.000Z'
+owner: security-team
+enforcement:
+  mode: block
+evidence:
+  - type: legacy
+    description: PCI-DSS 6.5.1
+metadata:
+  migrated_from: nodenet-legacy

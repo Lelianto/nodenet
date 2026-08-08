@@ -16,6 +16,7 @@ import type { SafeRelativePath } from "../security/filesystem.js";
 import type { OwnershipRecord, OwnershipSource, OwnershipConfidence } from "./schema.js";
 import { SOURCE_PRIORITY, CONFIDENCE_RANK } from "./schema.js";
 import type { ContextRecord } from "../context/schema.js";
+import { isActiveContext } from "../context/lcdd.js";
 import type { LoadedConfig } from "../config/config.js";
 
 export interface OwnershipResolution {
@@ -42,6 +43,7 @@ export function buildOwnershipIndex(
 
   // 1. LCDD context metadata: context owner + appliesTo glob.
   for (const ctx of contexts) {
+    if (!isActiveContext(ctx)) continue;
     if (!ctx.owner) continue;
     for (const pattern of ctx.appliesTo) {
       records.push({

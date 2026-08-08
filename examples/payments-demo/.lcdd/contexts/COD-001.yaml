@@ -1,0 +1,34 @@
+id: COD-001
+version: 1
+created_at: '2026-03-01T00:00:00.000Z'
+updated_at: '2026-08-08T14:16:09.927Z'
+title: Explicit Error Handling
+description: All exported functions must throw typed errors; no silent failures.
+source:
+  type: unknown
+  location: handbook/conventions.md
+  extraction_method: manual
+authority:
+  source:
+    type: organization
+    id: checkout-team
+    name: checkout-team
+  level: 1
+  trust_model: direct
+category: codingConvention
+applies_to:
+  - src/checkout/**
+lifecycle: active
+governance:
+  classification: local-guideline
+  approval_required: false
+  approvers: []
+effective_date: '2026-03-01T00:00:00.000Z'
+owner: checkout-team
+enforcement:
+  mode: comment
+evidence:
+  - type: legacy
+    description: HANDBOOK-014
+metadata:
+  migrated_from: nodenet-legacy

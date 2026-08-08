@@ -9,7 +9,7 @@ a real-world cross-team scenario:
 - **Security Team** owns `src/security/**` and hardened context `SEC-009`
   (PCI payment data validation, HARDENED — immutable to AI agents).
 
-Living context lives in `.nodenet/context.json`, explicit ownership in
+Living Context lives in the canonical `.lcdd/contexts/` Registry; explicit ownership remains in
 `.nodenet/ownership.json`, and a `CODEOWNERS` fallback exists too.
 
 ## Run it

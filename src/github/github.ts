@@ -29,16 +29,23 @@ import {
   postIssueComment,
   requestReviewers,
 } from "./client.js";
+import {
+  buildGovernanceDecision,
+  type GovernanceDecision,
+  type GovernanceMode,
+} from "../governance/decision.js";
 
 export interface PrAnalyzeOptions {
   base?: string;
   authorTeam?: string;
   enforcePolicy?: boolean;
+  mode?: GovernanceMode;
 }
 
 export interface PrAnalyzeResult {
   impact: ImpactReport;
   review: ReviewResolution;
+  decision: GovernanceDecision;
   comment: string;
 }
 
@@ -58,10 +65,11 @@ export function analyzePr(
   });
   if (!impact.ok) return impact;
   const review = resolveReviewers(root, config, impact.value);
+  const decision = buildGovernanceDecision(impact.value, review, opts.mode ?? "warn");
   const comment = buildPrComment(impact.value, review, {
     ...(opts.enforcePolicy !== undefined ? { enforcePolicy: opts.enforcePolicy } : {}),
   });
-  return ok({ impact: impact.value, review, comment });
+  return ok({ impact: impact.value, review, decision, comment });
 }
 
 export interface PrPostOptions extends PrAnalyzeOptions {
@@ -99,11 +107,12 @@ export async function runPrIntegration(
     opts,
   );
   if (!analyzed.ok) return analyzed;
-  const { impact, review, comment } = analyzed.value;
+  const { impact, review, decision, comment } = analyzed.value;
 
   const result: PrPostResult = {
     impact,
     review,
+    decision,
     comment,
     commentPosted: false,
     requestedReviewers: [],

@@ -65,6 +65,18 @@ describe("nodenet CLI", () => {
     expect(output).toContain("SEC-009");
   });
 
+  it("context migrates legacy records to the LCDD 0.6 Registry", async () => {
+    const repo = work("cross-team");
+    const preview = await runCli(["context", "--migrate", "--json"], { cwd: repo });
+    expect(preview).toBe(0);
+    expect(fs.existsSync(path.join(repo, ".lcdd", "contexts", "PAYMENT-003.yaml"))).toBe(false);
+
+    const written = await runCli(["context", "--migrate", "--write", "--json"], { cwd: repo });
+    expect(written).toBe(0);
+    expect(fs.existsSync(path.join(repo, ".lcdd", "contexts", "PAYMENT-003.yaml"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".lcdd", "contexts", "SEC-009.yaml"))).toBe(true);
+  });
+
   it("health reports metrics derived from graph state", async () => {
     const repo = work("cross-team");
     expect(await runCli(["build"], { cwd: repo })).toBe(0);
@@ -122,6 +134,36 @@ describe("nodenet CLI", () => {
     const review = JSON.parse(output);
     expect(review.required.map((r: { target: string }) => r.target)).toContain("payment-team");
     expect(review.authorityRequired.map((r: { target: string }) => r.target)).toContain("finance-team");
+  });
+
+  it("github pr exits with code 2 for a blocking decision in enforce mode", async () => {
+    const repo = work("cross-team");
+    const git = (args: string[]): void => {
+      const result = spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+      expect(result.status).toBe(0, result.stderr ?? "");
+    };
+    git(["init", "-b", "main"]);
+    git(["config", "user.email", "test@nodenet.dev"]);
+    git(["config", "user.name", "NodeNet Test"]);
+    git(["add", "-A"]);
+    git(["commit", "-m", "init"]);
+    git(["switch", "-c", "feature"]);
+
+    const file = path.join(repo, "src", "payment", "PaymentService.ts");
+    fs.appendFileSync(file, "\nexport const governanceProbe = true;\n");
+    git(["add", "-A"]);
+    git(["commit", "-m", "change hardened payment code"]);
+
+    expect(await runCli(["build", "--json"], { cwd: repo })).toBe(0);
+    const result = await runCli([
+      "github", "pr",
+      "--repo", "acme/cart",
+      "--pr", "42",
+      "--base", "main",
+      "--mode", "enforce",
+      "--json",
+    ], { cwd: repo });
+    expect(result).toBe(2);
   });
 
   it("graph generates static HTML", async () => {

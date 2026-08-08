@@ -30,6 +30,9 @@ export const CODE_RELATIONS = [
   "tests",
   "configures",
   "depends_on",
+  "documents",
+  "defines",
+  "deploys",
 ] as const;
 export type CodeRelation = (typeof CODE_RELATIONS)[number];
 
@@ -88,11 +91,25 @@ export type EdgeSource =
   | "inferred"
   | "change-analysis";
 
+export const EVIDENCE_CLASSES = ["EXTRACTED", "DECLARED", "INFERRED", "AMBIGUOUS", "OBSERVED"] as const;
+export type EvidenceClass = (typeof EVIDENCE_CLASSES)[number];
+
+export function evidenceClassForSource(source: EdgeSource): EvidenceClass {
+  if (source === "ast" || source === "config") return "EXTRACTED";
+  if (source === "context-file" || source === "codeowners" || source === "user") return "DECLARED";
+  if (source === "inferred" || source === "git-history") return "INFERRED";
+  return source === "change-analysis" ? "OBSERVED" : "AMBIGUOUS";
+}
+
 export interface EdgeProvenance {
   /** Where this edge came from. */
   source: EdgeSource;
+  /** Trust category independent from the concrete source. */
+  classification?: EvidenceClass;
   /** Human-readable location, e.g. `src/app.ts:12`. */
   location?: string;
+  /** Optional explanation for inferred or ambiguous claims. */
+  rationale?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +146,9 @@ export const RELATION_RULES: Record<Relation, { from: NodeKind[] | "*"; to: Node
   tests: { from: ["test", "file"], to: ["file", "function", "method", "class"] },
   configures: { from: ["configuration"], to: ["repository", "workspace", "package", "file"] },
   depends_on: { from: ["file", "package", "workspace"], to: ["package", "workspace", "file"] },
+  documents: { from: ["document"], to: "*" },
+  defines: { from: ["document", "configuration"], to: ["apiOperation", "databaseTable", "infrastructureResource"] },
+  deploys: { from: ["infrastructureResource"], to: ["package", "file", "apiOperation"] },
   governed_by: { from: "*", to: [...CONTEXT_NODE_KINDS] },
   constrained_by: { from: "*", to: [...CONTEXT_NODE_KINDS] },
   implements_context: { from: "*", to: [...CONTEXT_NODE_KINDS] },

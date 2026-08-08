@@ -18,12 +18,12 @@ security.
 | --- | --- | --- |
 | Local, deterministic parsing (no LLM, no vector store) | ✅ | ✅ |
 | Interactive visualization + communities | ✅ | ✅ |
-| AI / MCP integration | ✅ stdio | + shared HTTP |
-| Multi-language parsing | TS/JS only | top 6+ languages (Python, Go, Java, Rust, Ruby, C#) |
-| Assistant skill install (Claude Code, Codex, Cursor, Gemini, OpenCode…) | manual | one-command `nodenet install` |
+| AI / MCP integration | ✅ stdio + loopback-first HTTP | authentication and team hardening |
+| Multi-language parsing | ✅ 10 languages: 7 full + 3 basic | deeper semantic resolution per adapter |
+| Assistant skill install | ✅ Codex, Claude, Cursor, Agent Skills | additional platforms |
 | Auto-generated report (god nodes, surprising connections, suggested questions) | ✅ `nodenet report` | ✅ |
-| PR dashboard + merge-order conflict detection | impact/reviewers only | dashboard + `--conflicts` |
-| Docs / markdown / ADR ingestion as graph nodes | ❌ | ✅ |
+| PR dashboard + merge-order conflict detection | ✅ local multi-ref `changes` | hosted dashboard |
+| Docs / markdown / ADR ingestion as graph nodes | ✅ ADR/OpenAPI/SQL/Terraform | richer cross-links |
 | Git hook auto-rebuild + graph.json merge driver | ❌ | ✅ |
 | Published benchmarks | ❌ | ✅ |
 | README translations | 1 language | multiple |
@@ -48,9 +48,10 @@ security.
 
 ## Round 2 — core feature gaps
 
-6. **Multi-language parsing (Phase 9)** — tree-sitter via **WASM** (keeps zero
-   native dependencies), starting with Python, Go, Java, Rust, Ruby, C#.
-   *Largest single gap.*
+6. **Multi-language parsing (Phase 9, done)** — ten deterministic local
+   adapters: full TypeScript, JavaScript, Python, Go, Java, C#, PHP; basic
+   Rust, Ruby and Kotlin. Future work deepens semantic resolution without
+   changing the public adapter contract.
 7. **Docs / ADR ingestion** — treat markdown, ADRs, RFCs, and inline rationale
    comments as first-class context nodes linked to the code they govern.
    Aligns with Living Context Driven Development (LCDD).

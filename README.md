@@ -7,10 +7,14 @@
 </p>
 
 <p align="center">
+  <img src="docs/language-support.svg" alt="NodeNet supports seven full and three basic programming languages" width="900" />
+</p>
+
+<p align="center">
   <a href="https://www.npmjs.com/package/@antihero/nodenet"><img src="https://img.shields.io/npm/v/@antihero/nodenet?logo=npm&label=version" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/@antihero/nodenet"><img src="https://img.shields.io/npm/dm/@antihero/nodenet" alt="npm downloads" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/@antihero/nodenet" alt="license" /></a>
-  <a href="package.json"><img src="https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js" alt="Node.js >= 18" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js" alt="Node.js >= 20" /></a>
   <a href="tsconfig.json"><img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript" alt="TypeScript strict" /></a>
   <a href="https://github.com/Lelianto/nodenet/actions"><img src="https://img.shields.io/github/actions/workflow/status/Lelianto/nodenet/ci.yml?label=ci" alt="CI" /></a>
   <a href="https://github.com/Lelianto/nodenet"><img src="https://img.shields.io/github/stars/Lelianto/nodenet?style=social" alt="GitHub stars" /></a>
@@ -33,7 +37,7 @@ symbols, deps     governance      the code      hardened       what is affected 
 ```
 
 It is the practical reference implementation of **Living Context Driven
-Development (LCDDD)** — context treated as a living, versioned, governed
+Development (LCDD)** — context treated as a living, versioned, governed
 artifact ([living-context-driven-development](https://github.com/Lelianto/living-context-driven-development)).
 
 ---
@@ -110,7 +114,7 @@ owns it, and who must review a change.**
 repository
    │  nodenet build
    ▼
-scan  ──►  parse (TypeScript Compiler API, per-file, deterministic)
+scan  ──►  parse (tiered language adapters, per-file, deterministic)
    │            │
    │            ▼
    │     build code graph  (all nodes, then all edges — cross-file references
@@ -161,8 +165,9 @@ Authority approval required:
 ```
 
 Open the [interactive graph](examples/payments-demo/.nodenet/graph.html) from the
-example project to explore it visually: pan/zoom, hover, click nodes, search,
-and filter by layer.
+example project to explore the Graphify-style governance map: switch between
+Architecture, Governance, and Change views; pan/zoom; inspect evidence paths;
+and filter by community, semantic layer, or relationship type.
 
 ## Why NodeNet (vs Graphify & co)
 
@@ -183,8 +188,8 @@ the job: **governing how code changes**.
 | **Deterministic reviewer resolution with reasons** | ✅ | ❌ (AI triage) |
 | **Merge-policy gating on hardened/mandatory rules** | ✅ | ❌ |
 | **AI context bundles, secret-scanned** | ✅ | ❌ |
-| Multi-language parsing | TS/JS (planned: more) | 36+ |
-| Docs/PDFs/media ingestion | planned | ✅ |
+| Multi-language parsing | 10 languages: 7 full + 3 basic | 36+ |
+| ADR/OpenAPI/SQL/Terraform ingestion | ✅ deterministic | ✅ |
 
 **NodeNet is the governance layer for AI-driven development.** It answers
 *"who decides, and what may an AI agent change?"* — not just *"what is
@@ -196,7 +201,7 @@ understand code; NodeNet helps teams keep code changeable, safely.
 
 | Requirement | Minimum | Check |
 | --- | --- | --- |
-| Node.js | 18+ | `node --version` |
+| Node.js | 20+ | `node --version` |
 | git | any | `git --version` (needed for `impact` / `reviewers` / `update`) |
 
 ## Install
@@ -237,8 +242,28 @@ nodenet reviewers --base main                 # who should review it
 nodenet report                                # highlights: god nodes, communities, governance
 nodenet health                                # context health report
 nodenet graph                                 # interactive HTML visualization
+nodenet graph --change --base main            # overlay impact + governance decision
 nodenet graph -f svg -o graph.svg             # static SVG image
+nodenet changes --base main --refs feature-a feature-b # local multi-branch collision triage
+nodenet install --platform codex              # query-first project guidance
+nodenet serve --port 7341                     # shared local HTTP MCP at /mcp
 ```
+
+Incremental builds reuse unchanged local parse results. Built-in deterministic
+adapters cover ten major languages. Governance-relevant ADR
+Markdown, OpenAPI, SQL schemas, and Terraform resources are added to the same
+graph without an LLM or paid service. Every relationship is classified as
+`EXTRACTED`, `DECLARED`, `INFERRED`, `AMBIGUOUS`, or `OBSERVED`.
+
+| Support | Languages | Extraction contract |
+|---|---|---|
+| Full | TypeScript, JavaScript, Python, Go, Java, C#, PHP | declarations, imports/dependencies, visibility/exports, classes and methods, language-specific structural relationships |
+| Basic | Rust, Ruby, Kotlin | files, primary declarations, and imports/dependencies |
+
+Run `nodenet languages` or `nodenet languages --json` to inspect the exact
+adapter and capability matrix installed in the current NodeNet version.
+Full per-language examples and access methods are documented in
+[docs/languages.md](docs/languages.md).
 
 Machine-readable output: append `--json` to `build`, `query`, `related`,
 `trace`, `context`, `explain`, `owner`, `governed-by`, `impact`, `reviewers`,
@@ -266,28 +291,51 @@ the full option reference.
 | `health` | Living context health report |
 | `report` | Deterministic highlights report: god nodes, surprising connections, communities, governance, suggested questions |
 | `graph [-o <file>] [-f html\|svg]` | Generate an interactive HTML viewer or static SVG image with communities |
+| `languages [--json]` | Show the ten-language support tier and capability matrix |
+| `changes --base <ref> --refs <refs...>` | Compare local branches for graph, context, and ownership collisions |
 | `doctor` | Validate config, graph and health |
 | `github pr [options]` | Analyze a PR; post the impact comment and/or request reviewers |
 | `mcp` | Run the MCP server over stdio for AI assistants |
+| `serve [--host] [--port] [--token]` | Share MCP over loopback-first HTTP |
+| `install --platform <name>` | Install query-first guidance for Codex, Claude, Cursor, or Agent Skills |
 
 ## How governance is declared
 
-Living context lives in `.nodenet/context.json` (or `.nodenet/contexts/*.json`),
-aligned with the LCDD context schema:
+Living Context uses the canonical **LCDD 0.6.0 Registry** under
+`.lcdd/contexts/**/*.yaml`. NodeNet validates these artifacts with the pinned
+`@lcdd/core@0.6.0` SDK and retains the complete canonical object while deriving
+the graph view it needs:
 
-```json
-{
-  "id": "PAYMENT-003",
-  "version": 1,
-  "title": "Settlement Processing Rule",
-  "type": "domainRule",
-  "status": "ACTIVE",
-  "authority": "STANDARD",
-  "appliesTo": ["src/payment/**"],
-  "owner": "payment-team",
-  "approvedBy": ["finance-team"],
-  "provenance": { "source": "architecture-decision", "kind": "USER_DECLARED", "createdBy": "payment-team", "createdAt": "..." }
-}
+```yaml
+id: PAYMENT-003
+version: 1
+title: Settlement Processing Rule
+description: Settlement creation must be idempotent and auditable.
+source:
+  type: documentation
+  location: docs/adr/003-settlement.md
+authority:
+  source: { type: organization, id: finance-team, name: Finance Team }
+  level: 3
+category: domainRule
+applies_to: [src/payment/**]
+lifecycle: active
+governance:
+  classification: hardened-standard
+  approval_required: true
+  approvers: [finance-team]
+effective_date: 2026-08-08T00:00:00.000Z
+owner: payment-team
+enforcement:
+  mode: block
+```
+
+The legacy `.nodenet/context.json` format remains readable for compatibility
+but emits a deprecation warning. Preview and write a canonical migration with:
+
+```bash
+nodenet context --migrate
+nodenet context --migrate --write
 ```
 
 Ownership can come from:
@@ -298,7 +346,7 @@ Ownership can come from:
 4. **Git history** — *suggestion only*, never a required reviewer
 
 See [docs/concepts/living-context.md](docs/concepts/living-context.md) for the
-lifecycle (`DRAFT → CANDIDATE → APPROVED → ACTIVE → …`) and
+lifecycle (`draft → candidate → approved → active → …`) and
 [docs/concepts/ownership.md](docs/concepts/ownership.md) for the source ranking.
 
 ## Configuration
@@ -340,12 +388,15 @@ produces the same deterministic impact + review report, optionally posting it:
 
 ```bash
 nodenet github pr --repo owner/name --pr 42 --base main \
-  --comment --request-reviewers
+  --comment --request-reviewers --mode warn
 ```
 
 - `--comment` posts the impact + reviewers comment to the PR.
 - `--request-reviewers` requests **declared** reviewers only (required +
   authority-required) — git-history suggestions are never auto-requested.
+- `--mode observe|warn|enforce` controls rollout. A blocking hardened/mandatory
+  decision exits with code `2` only in `enforce` mode, so the command can be a
+  required status check. `--json` emits the stable Governance Decision v1.
 - Auth via `GITHUB_TOKEN` (least privilege: `contents: read`,
   `pull-requests: write`); `GITHUB_REPOSITORY` / `GITHUB_REF` /
   `GITHUB_BASE_REF` are read automatically in Actions.
@@ -373,7 +424,7 @@ starts with the same map:
 
 ```
 # commit these
-.nodenet/context.json      # authored living context
+.lcdd/contexts/*.yaml      # canonical LCDD 0.6 Living Context Registry
 .nodenet/ownership.json    # authored explicit ownership
 nodenet.config.json        # review policy, teams, limits
 .nodenet/graph.html        # interactive visualization
@@ -385,7 +436,7 @@ Recommended workflow:
 2. Everyone pulls — `query`/`trace`/`impact` work immediately.
 3. `nodenet impact --base main` runs in CI on every PR (and `github pr` posts
    the comment and requests reviewers).
-4. When rules change, edit `.nodenet/context.json` and commit — the lifecycle
+4. When rules change, edit `.lcdd/contexts/*.yaml` and commit — the lifecycle
    and audit log keep the change explainable.
 
 The [example project](examples/payments-demo) demonstrates the whole flow.
@@ -435,11 +486,12 @@ npm run typecheck
 npm test
 ```
 
-106 tests across 12 suites. Fixtures cover basic TypeScript, React, a monorepo,
+Tests cover the declared extraction contract for all ten supported languages,
+React, a monorepo,
 the cross-team MVP scenario, CODEOWNERS, circular dependencies, malformed
 source, and a malicious repository. Property-based tests cover lifecycle
 transitions, traversal termination, glob matching and path safety. CI runs on
-Node 18, 20 and 22.
+Node 20 and 22.
 
 ## Roadmap
 
@@ -452,7 +504,7 @@ Node 18, 20 and 22.
 - **Phase 7 (done):** AI integration — MSC output + `mcp` server
 - **Phase 8 (done):** richer visualization — interactive force-directed graph with communities (`graph`, `graph -f svg`)
 - **Quick win (done):** highlights report — `report` (god nodes, surprising connections, communities, governance)
-- Phase 9: multi-language parsing
+- **Phase 9 (done):** ten-language parsing — seven full and three basic adapters
 - Phase 10: GitHub Action wrapper + merge-block policy
 - Phase 11: docs/PDF ingestion + richer AI (optional LLM backends)
 
@@ -485,9 +537,10 @@ Change Proposal; it never modifies the active context and requires human
 review and approval.
 
 **What if my repo is not TypeScript?**
-Current support is TS/TSX/JS/JSX. Governance (context, ownership, authority)
-works on any repo; code parsing for other languages is on the roadmap
-(Phase 9).
+Run `nodenet languages`. NodeNet supports TypeScript, JavaScript, Python, Go,
+Java, C#, PHP, Rust, Ruby, and Kotlin. Governance at file level also works for
+unparsed repository artifacts; see [language support](docs/languages.md) for
+the exact full/basic contract.
 
 ## License
 

@@ -11,6 +11,7 @@
 import * as v from "valibot";
 import type { ContextId } from "../types/brand.js";
 import type { AuthorityLevel } from "../authority/authority.js";
+import type { Context as LcddContext, EnforcementMode as LcddEnforcementMode } from "@lcdd/core";
 
 // ---------------------------------------------------------------------------
 // Enumerations
@@ -115,6 +116,12 @@ export interface ContextRecord {
   provenance: Provenance;
   conflictsWith?: ContextId[];
   supersedes?: ContextId[];
+  /** Canonical source format used to load this record. */
+  sourceFormat?: "lcdd-0.6" | "nodenet-legacy";
+  /** LCDD enforcement behavior. Legacy records derive this from authority. */
+  enforcementMode?: LcddEnforcementMode;
+  /** Lossless canonical LCDD artifact when loaded from the LCDD Registry. */
+  canonical?: LcddContext;
 }
 
 export const ContextRecordSchema = v.object({

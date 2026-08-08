@@ -16,6 +16,7 @@ This directory is the hub for all NodeNet documentation. Start with the
 | 7 | Change impact analysis | [concepts/change-impact.md](concepts/change-impact.md) |
 | 8 | Review governance | [concepts/review-governance.md](concepts/review-governance.md) |
 | 9 | Security model | [security/threat-model.md](security/threat-model.md) |
+| 10 | Supported languages and usage | [languages.md](languages.md) |
 
 ## Concepts
 
@@ -33,6 +34,8 @@ Core mental model documents.
   explainable impact report.
 - [review-governance.md](concepts/review-governance.md) — severity policy and how
   reviewers are resolved with deduplicated, explainable reasons.
+- [languages.md](languages.md) — ten-language capability matrix, examples,
+  tests, and CLI/MCP/API/visualization access paths.
 
 ## Architecture decision records
 

@@ -41,17 +41,19 @@ context + ownership from disk.
 | `src/scanner/` | Iterative repo walk, ignore patterns, symlink defense |
 | `src/parser/` | TypeScript Compiler API → symbols, imports/exports, references, JSX |
 | `src/analyzer/` | Code graph builder + governance layer merger |
-| `src/context/` | LCDD-aligned schema, lifecycle transitions, provenance, loader |
+| `src/context/` | Canonical LCDD 0.6 Registry adapter, legacy migration, lifecycle and provenance |
+| `src/parser/` | Tiered local language registry: full TypeScript, JavaScript, Python, Go, Java, C#, PHP; basic Rust, Ruby, Kotlin |
 | `src/ownership/` | Source-ranked ownership resolution, CODEOWNERS, git-history suggestions |
 | `src/authority/` | Authority levels + LCDD governance classification mapping |
 | `src/change/` | Git diff (arg arrays only), unified-diff parsing, symbol-level diff, impact |
+| `src/integration/` | Reversible query-first guidance installers for Codex, Claude, Cursor, and Agent Skills |
 | `src/review/` | Severity derivation, reviewer resolution with dedup |
 | `src/health/` | Metrics derived strictly from graph state |
 | `src/ai/` | Minimum Sufficient Context bundle builder |
 | `src/storage/` | `.nodenet/` persistence, fingerprint index, symbol cache, audit log |
-| `src/visualization/` | Interactive self-contained HTML export (force-directed layout, community detection, canvas viewer) |
+| `src/visualization/` | Self-contained governance map: community layout, semantic shapes, authority rings, change-decision overlay, evidence inspector |
 | `src/github/` | GitHub REST client (global fetch), PR comment builder, PR integration (`github pr`) |
-| `src/mcp/` | Dependency-free MCP server over stdio (graph + governance tools for AI assistants) |
+| `src/mcp/` | Dependency-free MCP over stdio or loopback-first HTTP for shared local agent access |
 | `src/cli/` | All commands (spec §54) |
 
 ## Key design decisions
