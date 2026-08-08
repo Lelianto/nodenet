@@ -110,21 +110,9 @@ owns it, and who must review a change.**
 `nodenet build` runs a deterministic, offline pipeline (see
 [ARCHITECTURE.md](ARCHITECTURE.md)):
 
-```
-repository
-   │  nodenet build
-   ▼
-scan  ──►  parse (tiered language adapters, per-file, deterministic)
-   │            │
-   │            ▼
-   │     build code graph  (all nodes, then all edges — cross-file references
-   │            │            always resolve, nothing is dropped)
-   ▼            ▼
-merge governance layers  (context, ownership, authority as typed nodes + edges)
-   │
-   ▼
-persist  (.nodenet/graph.json + index.json fingerprints + symbols.json)
-```
+<p align="center">
+  <img src="docs/how-it-works.svg" alt="NodeNet turns repository signals and LCDD governance into explainable change decisions" width="1000" />
+</p>
 
 Analysis commands (`query`, `related`, `trace`, `impact`, `reviewers`, `health`,
 ...) load the persisted graph, re-validate it at runtime, and answer from one

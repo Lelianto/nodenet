@@ -64,7 +64,8 @@
     "dist",
     "README.md",
     "docs/languages.md",
-    "docs/language-support.svg"
+    "docs/language-support.svg",
+    "docs/how-it-works.svg"
   ],
   "engines": {
     "node": ">=20"
