@@ -31,9 +31,24 @@ export interface ScanResult {
 
 const ALWAYS_IGNORED = [".git", "node_modules", ".nodenet"];
 
+/**
+ * Ignore patterns without glob characters or separators (e.g. `dist`, `build`)
+ * are treated as directory names to skip at any depth, mirroring how
+ * ALWAYS_IGNORED works — monorepos nest build outputs under packages/ or apps/.
+ */
+function plainIgnoreNames(ignore: string[]): Set<string> {
+  const names = new Set<string>();
+  for (const pattern of ignore) {
+    if (pattern.includes("/") || pattern.includes("*") || pattern.includes("?")) continue;
+    names.add(pattern);
+  }
+  return names;
+}
+
 export function scanRepository(root: string, config: LoadedConfig): Result<ScanResult, Error> {
   const result: ScanResult = { files: [], packageJsonPaths: [], warnings: [] };
   const seen = new Set<string>();
+  const plainIgnored = plainIgnoreNames(config.ignore);
 
   const stack: string[] = [root];
   while (stack.length > 0) {
@@ -66,8 +81,11 @@ export function scanRepository(root: string, config: LoadedConfig): Result<ScanR
         }
       }
 
-      const topSegment = relPosix.split("/")[0] ?? "";
-      if (ALWAYS_IGNORED.includes(topSegment)) continue;
+      // Always-ignored directories are skipped at any depth (monorepos commonly
+      // nest node_modules under apps/ or packages/), not just at the root. Plain
+      // ignore names (dist, build, …) are honored the same way.
+      const segments = relPosix.split("/");
+      if (segments.some((seg) => ALWAYS_IGNORED.includes(seg) || plainIgnored.has(seg))) continue;
       if (matchGlobIn(config.ignore, relPosix)) continue;
       if (isSecretFilePath(relPosix)) continue;
 

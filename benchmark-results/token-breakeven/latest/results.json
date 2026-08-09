@@ -1,0 +1,1015 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-08-09T14:47:48.757Z",
+  "estimator": "bytes / 4 (same estimator as src/ai/context-builder.ts estimateTokens)",
+  "baselines": {
+    "greppedRead": "sum of bytes of every authored file containing the target identifier — the cost of reading each grep candidate",
+    "bestCaseRead": "bytes of the single file that defines the target — a perfect-luck unaided agent"
+  },
+  "variants": {
+    "defaultEmitted": "current NodeNet output: context --detail evidence --json (pretty-printed, as actually emitted)",
+    "tier1Lean": "compact JSON minus codeContext and selectionReason",
+    "profileRoute": "proposed route profile: files + ownership + governance, no code evidence"
+  },
+  "corpora": [
+    {
+      "id": "fixture-basic-typescript",
+      "label": "Fixture: basic TypeScript",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1/test/fixtures/basic-typescript",
+      "graph": {
+        "nodes": 18,
+        "edges": 24
+      },
+      "authored": {
+        "files": 4,
+        "tokens": 187
+      },
+      "targets": [
+        {
+          "target": "main",
+          "resolvedTarget": "main() @ src/app.ts:3",
+          "evidenceItems": 9,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 68,
+            "bestCaseReadTokens": 68
+          },
+          "tokens": {
+            "reportedEstimate": 803,
+            "defaultEmitted": 1033,
+            "tier1Lean": 531,
+            "profileRoute": 93
+          }
+        },
+        {
+          "target": "testAdd",
+          "resolvedTarget": "testAdd() @ src/math.test.ts:3",
+          "evidenceItems": 4,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 42,
+            "bestCaseReadTokens": 42
+          },
+          "tokens": {
+            "reportedEstimate": 422,
+            "defaultEmitted": 544,
+            "tier1Lean": 303,
+            "profileRoute": 95
+          }
+        },
+        {
+          "target": "unusedHelper",
+          "resolvedTarget": "unusedHelper() @ src/app.ts:12",
+          "evidenceItems": 3,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 68,
+            "bestCaseReadTokens": 68
+          },
+          "tokens": {
+            "reportedEstimate": 337,
+            "defaultEmitted": 436,
+            "tier1Lean": 249,
+            "profileRoute": 91
+          }
+        }
+      ],
+      "summary": {
+        "cases": 3,
+        "greppedReadTokens": 68,
+        "bestCaseReadTokens": 68,
+        "defaultEmittedTokens": 544,
+        "tier1LeanTokens": 303,
+        "profileRouteTokens": 93
+      }
+    },
+    {
+      "id": "fixture-react-app",
+      "label": "Fixture: React app",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1/test/fixtures/react-app",
+      "graph": {
+        "nodes": 13,
+        "edges": 17
+      },
+      "skipped": "no code symbols eligible as targets"
+    },
+    {
+      "id": "fixture-monorepo",
+      "label": "Fixture: monorepo",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1/test/fixtures/monorepo",
+      "graph": {
+        "nodes": 14,
+        "edges": 17
+      },
+      "authored": {
+        "files": 5,
+        "tokens": 131
+      },
+      "targets": [
+        {
+          "target": "appMain",
+          "resolvedTarget": "appMain() @ packages/app/src/main.ts:3",
+          "evidenceItems": 5,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 34,
+            "bestCaseReadTokens": 34
+          },
+          "tokens": {
+            "reportedEstimate": 569,
+            "defaultEmitted": 712,
+            "tier1Lean": 402,
+            "profileRoute": 104
+          }
+        },
+        {
+          "target": "CoreResult",
+          "resolvedTarget": "CoreResult @ packages/core/src/index.ts:5",
+          "evidenceItems": 4,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 60,
+            "bestCaseReadTokens": 27
+          },
+          "tokens": {
+            "reportedEstimate": 489,
+            "defaultEmitted": 609,
+            "tier1Lean": 353,
+            "profileRoute": 101
+          }
+        },
+        {
+          "target": "coreValue",
+          "resolvedTarget": "coreValue() @ packages/core/src/index.ts:1",
+          "evidenceItems": 4,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 60,
+            "bestCaseReadTokens": 27
+          },
+          "tokens": {
+            "reportedEstimate": 489,
+            "defaultEmitted": 609,
+            "tier1Lean": 353,
+            "profileRoute": 101
+          }
+        }
+      ],
+      "summary": {
+        "cases": 3,
+        "greppedReadTokens": 60,
+        "bestCaseReadTokens": 27,
+        "defaultEmittedTokens": 609,
+        "tier1LeanTokens": 353,
+        "profileRouteTokens": 101
+      }
+    },
+    {
+      "id": "payments-demo",
+      "label": "Example: payments demo",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1/examples/payments-demo",
+      "graph": {
+        "nodes": 52,
+        "edges": 90
+      },
+      "authored": {
+        "files": 16,
+        "tokens": 2430
+      },
+      "targets": [
+        {
+          "target": "createSettlement",
+          "resolvedTarget": "createSettlement() @ src/payment/PaymentService.ts:4",
+          "evidenceItems": 12,
+          "baseline": {
+            "grepMatchedFiles": 3,
+            "greppedReadTokens": 943,
+            "bestCaseReadTokens": 128
+          },
+          "tokens": {
+            "reportedEstimate": 1545,
+            "defaultEmitted": 1925,
+            "tier1Lean": 1111,
+            "profileRoute": 334
+          }
+        },
+        {
+          "target": "runCheckout",
+          "resolvedTarget": "runCheckout() @ src/checkout/CheckoutFlow.ts:10",
+          "evidenceItems": 10,
+          "baseline": {
+            "grepMatchedFiles": 3,
+            "greppedReadTokens": 870,
+            "bestCaseReadTokens": 105
+          },
+          "tokens": {
+            "reportedEstimate": 1147,
+            "defaultEmitted": 1434,
+            "tier1Lean": 802,
+            "profileRoute": 195
+          }
+        },
+        {
+          "target": "checkout",
+          "resolvedTarget": "checkout() @ src/checkout/CheckoutService.ts:4",
+          "evidenceItems": 14,
+          "baseline": {
+            "grepMatchedFiles": 9,
+            "greppedReadTokens": 1681,
+            "bestCaseReadTokens": 102
+          },
+          "tokens": {
+            "reportedEstimate": 1595,
+            "defaultEmitted": 1971,
+            "tier1Lean": 1094,
+            "profileRoute": 213
+          }
+        },
+        {
+          "target": "Settlement",
+          "resolvedTarget": "createSettlement() @ src/payment/PaymentService.ts:4",
+          "evidenceItems": 12,
+          "baseline": {
+            "grepMatchedFiles": 8,
+            "greppedReadTokens": 1550,
+            "bestCaseReadTokens": 88
+          },
+          "tokens": {
+            "reportedEstimate": 1545,
+            "defaultEmitted": 1925,
+            "tier1Lean": 1111,
+            "profileRoute": 334
+          }
+        },
+        {
+          "target": "CheckoutRequest",
+          "resolvedTarget": "CheckoutRequest @ src/checkout/CheckoutFlow.ts:4",
+          "evidenceItems": 8,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 157,
+            "bestCaseReadTokens": 105
+          },
+          "tokens": {
+            "reportedEstimate": 932,
+            "defaultEmitted": 1172,
+            "tier1Lean": 659,
+            "profileRoute": 179
+          }
+        }
+      ],
+      "summary": {
+        "cases": 5,
+        "greppedReadTokens": 943,
+        "bestCaseReadTokens": 105,
+        "defaultEmittedTokens": 1925,
+        "tier1LeanTokens": 1094,
+        "profileRouteTokens": 213
+      }
+    },
+    {
+      "id": "subset-small",
+      "label": "Self subset: core types + context",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1",
+      "subset": [
+        "src/authority",
+        "src/config",
+        "src/context",
+        "src/types",
+        "src/utils",
+        "src/identity",
+        "src/index.ts",
+        "src/version.ts"
+      ],
+      "graph": {
+        "nodes": 159,
+        "edges": 250
+      },
+      "authored": {
+        "files": 22,
+        "tokens": 16374
+      },
+      "targets": [
+        {
+          "target": "NodeNetError",
+          "resolvedTarget": "NodeNetError @ src/types/result.ts:20",
+          "evidenceItems": 16,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 592,
+            "bestCaseReadTokens": 592
+          },
+          "tokens": {
+            "reportedEstimate": 1580,
+            "defaultEmitted": 1973,
+            "tier1Lean": 1033,
+            "profileRoute": 117
+          }
+        },
+        {
+          "target": "adaptLcddContext",
+          "resolvedTarget": "adaptLcddContext() @ src/context/lcdd.ts:75",
+          "evidenceItems": 10,
+          "baseline": {
+            "grepMatchedFiles": 3,
+            "greppedReadTokens": 5747,
+            "bestCaseReadTokens": 1876
+          },
+          "tokens": {
+            "reportedEstimate": 1047,
+            "defaultEmitted": 1308,
+            "tier1Lean": 702,
+            "profileRoute": 119
+          }
+        },
+        {
+          "target": "applyDefaults",
+          "resolvedTarget": "applyDefaults() @ src/config/config.ts:185",
+          "evidenceItems": 13,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 2626,
+            "bestCaseReadTokens": 2626
+          },
+          "tokens": {
+            "reportedEstimate": 1351,
+            "defaultEmitted": 1680,
+            "tier1Lean": 896,
+            "profileRoute": 119
+          }
+        },
+        {
+          "target": "loadConfig",
+          "resolvedTarget": "loadConfig() @ src/config/config.ts:163",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 4885,
+            "bestCaseReadTokens": 2626
+          },
+          "tokens": {
+            "reportedEstimate": 1931,
+            "defaultEmitted": 2405,
+            "tier1Lean": 1246,
+            "profileRoute": 118
+          }
+        },
+        {
+          "target": "defaultConfig",
+          "resolvedTarget": "defaultConfig() @ src/config/config.ts:138",
+          "evidenceItems": 13,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 4885,
+            "bestCaseReadTokens": 2626
+          },
+          "tokens": {
+            "reportedEstimate": 1275,
+            "defaultEmitted": 1598,
+            "tier1Lean": 837,
+            "profileRoute": 119
+          }
+        }
+      ],
+      "summary": {
+        "cases": 5,
+        "greppedReadTokens": 4885,
+        "bestCaseReadTokens": 2626,
+        "defaultEmittedTokens": 1680,
+        "tier1LeanTokens": 896,
+        "profileRouteTokens": 119
+      }
+    },
+    {
+      "id": "subset-medium",
+      "label": "Self subset: + ai + parser",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1",
+      "subset": [
+        "src/authority",
+        "src/config",
+        "src/context",
+        "src/types",
+        "src/utils",
+        "src/identity",
+        "src/index.ts",
+        "src/version.ts",
+        "src/ai",
+        "src/parser",
+        "src/storage",
+        "src/ownership"
+      ],
+      "graph": {
+        "nodes": 312,
+        "edges": 518
+      },
+      "authored": {
+        "files": 33,
+        "tokens": 37983
+      },
+      "targets": [
+        {
+          "target": "NodeNetError",
+          "resolvedTarget": "NodeNetError @ src/types/result.ts:20",
+          "evidenceItems": 16,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 592,
+            "bestCaseReadTokens": 592
+          },
+          "tokens": {
+            "reportedEstimate": 1580,
+            "defaultEmitted": 1973,
+            "tier1Lean": 1033,
+            "profileRoute": 117
+          }
+        },
+        {
+          "target": "askGraph",
+          "resolvedTarget": "askGraph() @ src/ai/retrieval.ts:32",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 5076,
+            "bestCaseReadTokens": 2816
+          },
+          "tokens": {
+            "reportedEstimate": 1906,
+            "defaultEmitted": 2383,
+            "tier1Lean": 1228,
+            "profileRoute": 117
+          }
+        },
+        {
+          "target": "buildContextBundle",
+          "resolvedTarget": "buildContextBundle() @ src/ai/context-builder.ts:105",
+          "evidenceItems": 19,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 6138,
+            "bestCaseReadTokens": 3879
+          },
+          "tokens": {
+            "reportedEstimate": 2007,
+            "defaultEmitted": 2464,
+            "tier1Lean": 1312,
+            "profileRoute": 124
+          }
+        },
+        {
+          "target": "dotNodenetDir",
+          "resolvedTarget": "dotNodenetDir() @ src/storage/storage.ts:24",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 6766,
+            "bestCaseReadTokens": 4506
+          },
+          "tokens": {
+            "reportedEstimate": 2005,
+            "defaultEmitted": 2484,
+            "tier1Lean": 1302,
+            "profileRoute": 120
+          }
+        },
+        {
+          "target": "parseStatement",
+          "resolvedTarget": "parseStatement() @ src/parser/typescript.ts:328",
+          "evidenceItems": 14,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 4418,
+            "bestCaseReadTokens": 4418
+          },
+          "tokens": {
+            "reportedEstimate": 1557,
+            "defaultEmitted": 1937,
+            "tier1Lean": 1052,
+            "profileRoute": 182
+          }
+        }
+      ],
+      "summary": {
+        "cases": 5,
+        "greppedReadTokens": 5076,
+        "bestCaseReadTokens": 3879,
+        "defaultEmittedTokens": 2383,
+        "tier1LeanTokens": 1228,
+        "profileRouteTokens": 120
+      }
+    },
+    {
+      "id": "subset-large",
+      "label": "Self subset: + graph + governance",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1",
+      "subset": [
+        "src/authority",
+        "src/config",
+        "src/context",
+        "src/types",
+        "src/utils",
+        "src/identity",
+        "src/index.ts",
+        "src/version.ts",
+        "src/ai",
+        "src/parser",
+        "src/storage",
+        "src/ownership",
+        "src/graph",
+        "src/evaluation",
+        "src/governance",
+        "src/review",
+        "src/change"
+      ],
+      "graph": {
+        "nodes": 538,
+        "edges": 934
+      },
+      "authored": {
+        "files": 55,
+        "tokens": 67675
+      },
+      "targets": [
+        {
+          "target": "NodeBase",
+          "resolvedTarget": "NodeBase @ src/graph/nodes.ts:73",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 2311,
+            "bestCaseReadTokens": 2311
+          },
+          "tokens": {
+            "reportedEstimate": 1938,
+            "defaultEmitted": 2418,
+            "tier1Lean": 1252,
+            "profileRoute": 115
+          }
+        },
+        {
+          "target": "NodeNetError",
+          "resolvedTarget": "NodeNetError @ src/types/result.ts:20",
+          "evidenceItems": 16,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 592,
+            "bestCaseReadTokens": 592
+          },
+          "tokens": {
+            "reportedEstimate": 1580,
+            "defaultEmitted": 1973,
+            "tier1Lean": 1033,
+            "profileRoute": 117
+          }
+        },
+        {
+          "target": "askGraph",
+          "resolvedTarget": "askGraph() @ src/ai/retrieval.ts:32",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 3,
+            "greppedReadTokens": 6758,
+            "bestCaseReadTokens": 2816
+          },
+          "tokens": {
+            "reportedEstimate": 1906,
+            "defaultEmitted": 2383,
+            "tier1Lean": 1228,
+            "profileRoute": 117
+          }
+        },
+        {
+          "target": "buildContextBundle",
+          "resolvedTarget": "buildContextBundle() @ src/ai/context-builder.ts:105",
+          "evidenceItems": 19,
+          "baseline": {
+            "grepMatchedFiles": 3,
+            "greppedReadTokens": 7821,
+            "bestCaseReadTokens": 3879
+          },
+          "tokens": {
+            "reportedEstimate": 2007,
+            "defaultEmitted": 2464,
+            "tier1Lean": 1312,
+            "profileRoute": 124
+          }
+        },
+        {
+          "target": "dotNodenetDir",
+          "resolvedTarget": "dotNodenetDir() @ src/storage/storage.ts:24",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 4,
+            "greppedReadTokens": 8155,
+            "bestCaseReadTokens": 4506
+          },
+          "tokens": {
+            "reportedEstimate": 2005,
+            "defaultEmitted": 2484,
+            "tier1Lean": 1302,
+            "profileRoute": 120
+          }
+        }
+      ],
+      "summary": {
+        "cases": 5,
+        "greppedReadTokens": 6758,
+        "bestCaseReadTokens": 2816,
+        "defaultEmittedTokens": 2418,
+        "tier1LeanTokens": 1252,
+        "profileRouteTokens": 117
+      }
+    },
+    {
+      "id": "lcdd",
+      "label": "LCDD specification + implementation",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/living-context-driven-development",
+      "graph": {
+        "nodes": 1236,
+        "edges": 1464
+      },
+      "authored": {
+        "files": 187,
+        "tokens": 471298
+      },
+      "targets": [
+        {
+          "target": "FileRegistry",
+          "resolvedTarget": "FileRegistry.ensureDir() @ implementation/packages/core/src/registry.ts:30",
+          "evidenceItems": 0,
+          "baseline": {
+            "grepMatchedFiles": 25,
+            "greppedReadTokens": 68775,
+            "bestCaseReadTokens": 3186
+          },
+          "tokens": {
+            "reportedEstimate": 135,
+            "defaultEmitted": 164,
+            "tier1Lean": 131,
+            "profileRoute": 95
+          }
+        },
+        {
+          "target": "renderFrameworkComponent",
+          "resolvedTarget": "renderFrameworkComponent() @ website/.vercel/output/functions/_render.func/.vercel/output/_functions/chunks/astro/server_CO48lhYi.mjs:1440",
+          "evidenceItems": 10,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 18990,
+            "bestCaseReadTokens": 18990
+          },
+          "tokens": {
+            "reportedEstimate": 1961,
+            "defaultEmitted": 2210,
+            "tier1Lean": 1389,
+            "profileRoute": 138
+          }
+        },
+        {
+          "target": "markHTMLString",
+          "resolvedTarget": "markHTMLString() @ website/.vercel/output/functions/_render.func/.vercel/output/_functions/chunks/astro/server_CO48lhYi.mjs:161",
+          "evidenceItems": 10,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 18990,
+            "bestCaseReadTokens": 18990
+          },
+          "tokens": {
+            "reportedEstimate": 1981,
+            "defaultEmitted": 2231,
+            "tier1Lean": 1402,
+            "profileRoute": 135
+          }
+        },
+        {
+          "target": "impactCommand",
+          "resolvedTarget": "impactCommand() @ implementation/packages/cli/src/commands/ownership.ts:113",
+          "evidenceItems": 14,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 6124,
+            "bestCaseReadTokens": 2493
+          },
+          "tokens": {
+            "reportedEstimate": 2018,
+            "defaultEmitted": 2404,
+            "tier1Lean": 1428,
+            "profileRoute": 297
+          }
+        },
+        {
+          "target": "toUTF8String",
+          "resolvedTarget": "toUTF8String() @ website/.vercel/output/functions/_render.func/.vercel/output/_functions/pages/_image.astro.mjs:12",
+          "evidenceItems": 11,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 8404,
+            "bestCaseReadTokens": 8404
+          },
+          "tokens": {
+            "reportedEstimate": 1951,
+            "defaultEmitted": 2222,
+            "tier1Lean": 1375,
+            "profileRoute": 129
+          }
+        }
+      ],
+      "summary": {
+        "cases": 5,
+        "greppedReadTokens": 18990,
+        "bestCaseReadTokens": 8404,
+        "defaultEmittedTokens": 2222,
+        "tier1LeanTokens": 1389,
+        "profileRouteTokens": 135
+      }
+    },
+    {
+      "id": "nodenet-self",
+      "label": "NodeNet self-repository",
+      "source": "/Users/leliantopradana/Documents/PlugNPlay/fb-1",
+      "graph": {
+        "nodes": 1170,
+        "edges": 1908
+      },
+      "authored": {
+        "files": 209,
+        "tokens": 294707
+      },
+      "targets": [
+        {
+          "target": "NodeBase",
+          "resolvedTarget": "NodeBase @ src/graph/nodes.ts:73",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 2311,
+            "bestCaseReadTokens": 2311
+          },
+          "tokens": {
+            "reportedEstimate": 1938,
+            "defaultEmitted": 2418,
+            "tier1Lean": 1252,
+            "profileRoute": 115
+          }
+        },
+        {
+          "target": "NodeNetError",
+          "resolvedTarget": "NodeNetError @ src/types/result.ts:20",
+          "evidenceItems": 16,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 592,
+            "bestCaseReadTokens": 592
+          },
+          "tokens": {
+            "reportedEstimate": 1580,
+            "defaultEmitted": 1973,
+            "tier1Lean": 1033,
+            "profileRoute": 117
+          }
+        },
+        {
+          "target": "buildTools",
+          "resolvedTarget": "buildTools() @ src/mcp/server.ts:236",
+          "evidenceItems": 20,
+          "baseline": {
+            "grepMatchedFiles": 1,
+            "greppedReadTokens": 8887,
+            "bestCaseReadTokens": 8887
+          },
+          "tokens": {
+            "reportedEstimate": 1992,
+            "defaultEmitted": 2503,
+            "tier1Lean": 1310,
+            "profileRoute": 191
+          }
+        },
+        {
+          "target": "runCli",
+          "resolvedTarget": "runCli() @ scripts/token-levers-probe.mjs:242",
+          "evidenceItems": 17,
+          "baseline": {
+            "grepMatchedFiles": 4,
+            "greppedReadTokens": 29758,
+            "bestCaseReadTokens": 20269
+          },
+          "tokens": {
+            "reportedEstimate": 1823,
+            "defaultEmitted": 2225,
+            "tier1Lean": 1200,
+            "profileRoute": 96
+          }
+        },
+        {
+          "target": "renderGovernanceMap",
+          "resolvedTarget": "renderGovernanceMap() @ src/visualization/governance-map.ts:90",
+          "evidenceItems": 15,
+          "baseline": {
+            "grepMatchedFiles": 2,
+            "greppedReadTokens": 24923,
+            "bestCaseReadTokens": 19294
+          },
+          "tokens": {
+            "reportedEstimate": 1744,
+            "defaultEmitted": 2116,
+            "tier1Lean": 1173,
+            "profileRoute": 131
+          }
+        }
+      ],
+      "summary": {
+        "cases": 5,
+        "greppedReadTokens": 8887,
+        "bestCaseReadTokens": 8887,
+        "defaultEmittedTokens": 2225,
+        "tier1LeanTokens": 1200,
+        "profileRouteTokens": 117
+      }
+    }
+  ],
+  "curve": [
+    {
+      "id": "fixture-monorepo",
+      "label": "Fixture: monorepo",
+      "nodes": 14,
+      "authoredFiles": 5,
+      "greppedReadTokens": 60,
+      "bestCaseReadTokens": 27,
+      "defaultEmittedTokens": 609,
+      "tier1LeanTokens": 353,
+      "profileRouteTokens": 101,
+      "defaultWins": false,
+      "tier1Wins": false,
+      "routeWins": false,
+      "defaultWinsBestCase": false,
+      "tier1WinsBestCase": false,
+      "routeWinsBestCase": false
+    },
+    {
+      "id": "fixture-basic-typescript",
+      "label": "Fixture: basic TypeScript",
+      "nodes": 18,
+      "authoredFiles": 4,
+      "greppedReadTokens": 68,
+      "bestCaseReadTokens": 68,
+      "defaultEmittedTokens": 544,
+      "tier1LeanTokens": 303,
+      "profileRouteTokens": 93,
+      "defaultWins": false,
+      "tier1Wins": false,
+      "routeWins": false,
+      "defaultWinsBestCase": false,
+      "tier1WinsBestCase": false,
+      "routeWinsBestCase": false
+    },
+    {
+      "id": "payments-demo",
+      "label": "Example: payments demo",
+      "nodes": 52,
+      "authoredFiles": 16,
+      "greppedReadTokens": 943,
+      "bestCaseReadTokens": 105,
+      "defaultEmittedTokens": 1925,
+      "tier1LeanTokens": 1094,
+      "profileRouteTokens": 213,
+      "defaultWins": false,
+      "tier1Wins": false,
+      "routeWins": true,
+      "defaultWinsBestCase": false,
+      "tier1WinsBestCase": false,
+      "routeWinsBestCase": false
+    },
+    {
+      "id": "subset-small",
+      "label": "Self subset: core types + context",
+      "nodes": 159,
+      "authoredFiles": 22,
+      "greppedReadTokens": 4885,
+      "bestCaseReadTokens": 2626,
+      "defaultEmittedTokens": 1680,
+      "tier1LeanTokens": 896,
+      "profileRouteTokens": 119,
+      "defaultWins": true,
+      "tier1Wins": true,
+      "routeWins": true,
+      "defaultWinsBestCase": true,
+      "tier1WinsBestCase": true,
+      "routeWinsBestCase": true
+    },
+    {
+      "id": "subset-medium",
+      "label": "Self subset: + ai + parser",
+      "nodes": 312,
+      "authoredFiles": 33,
+      "greppedReadTokens": 5076,
+      "bestCaseReadTokens": 3879,
+      "defaultEmittedTokens": 2383,
+      "tier1LeanTokens": 1228,
+      "profileRouteTokens": 120,
+      "defaultWins": true,
+      "tier1Wins": true,
+      "routeWins": true,
+      "defaultWinsBestCase": true,
+      "tier1WinsBestCase": true,
+      "routeWinsBestCase": true
+    },
+    {
+      "id": "subset-large",
+      "label": "Self subset: + graph + governance",
+      "nodes": 538,
+      "authoredFiles": 55,
+      "greppedReadTokens": 6758,
+      "bestCaseReadTokens": 2816,
+      "defaultEmittedTokens": 2418,
+      "tier1LeanTokens": 1252,
+      "profileRouteTokens": 117,
+      "defaultWins": true,
+      "tier1Wins": true,
+      "routeWins": true,
+      "defaultWinsBestCase": true,
+      "tier1WinsBestCase": true,
+      "routeWinsBestCase": true
+    },
+    {
+      "id": "nodenet-self",
+      "label": "NodeNet self-repository",
+      "nodes": 1170,
+      "authoredFiles": 209,
+      "greppedReadTokens": 8887,
+      "bestCaseReadTokens": 8887,
+      "defaultEmittedTokens": 2225,
+      "tier1LeanTokens": 1200,
+      "profileRouteTokens": 117,
+      "defaultWins": true,
+      "tier1Wins": true,
+      "routeWins": true,
+      "defaultWinsBestCase": true,
+      "tier1WinsBestCase": true,
+      "routeWinsBestCase": true
+    },
+    {
+      "id": "lcdd",
+      "label": "LCDD specification + implementation",
+      "nodes": 1236,
+      "authoredFiles": 187,
+      "greppedReadTokens": 18990,
+      "bestCaseReadTokens": 8404,
+      "defaultEmittedTokens": 2222,
+      "tier1LeanTokens": 1389,
+      "profileRouteTokens": 135,
+      "defaultWins": true,
+      "tier1Wins": true,
+      "routeWins": true,
+      "defaultWinsBestCase": true,
+      "tier1WinsBestCase": true,
+      "routeWinsBestCase": true
+    }
+  ],
+  "breakEven": {
+    "greppedRead": {
+      "defaultEmitted": {
+        "wins": true,
+        "firstWinningNodes": 159,
+        "firstWinningCorpus": "subset-small",
+        "lastLosingNodes": 52,
+        "detail": "between 52 and 159 graph nodes"
+      },
+      "tier1Lean": {
+        "wins": true,
+        "firstWinningNodes": 159,
+        "firstWinningCorpus": "subset-small",
+        "lastLosingNodes": 52,
+        "detail": "between 52 and 159 graph nodes"
+      },
+      "profileRoute": {
+        "wins": true,
+        "firstWinningNodes": 52,
+        "firstWinningCorpus": "payments-demo",
+        "lastLosingNodes": 18,
+        "detail": "between 18 and 52 graph nodes"
+      }
+    },
+    "bestCaseRead": {
+      "defaultEmitted": {
+        "wins": true,
+        "firstWinningNodes": 159,
+        "firstWinningCorpus": "subset-small",
+        "lastLosingNodes": 52,
+        "detail": "between 52 and 159 graph nodes"
+      },
+      "tier1Lean": {
+        "wins": true,
+        "firstWinningNodes": 159,
+        "firstWinningCorpus": "subset-small",
+        "lastLosingNodes": 52,
+        "detail": "between 52 and 159 graph nodes"
+      },
+      "profileRoute": {
+        "wins": true,
+        "firstWinningNodes": 159,
+        "firstWinningCorpus": "subset-small",
+        "lastLosingNodes": 52,
+        "detail": "between 52 and 159 graph nodes"
+      }
+    }
+  }
+}

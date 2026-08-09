@@ -83,6 +83,13 @@ const SuppressionSchema = v.object({
   expiresAt: v.optional(v.string()),
 });
 
+const DeclaredRelationshipSchema = v.object({
+  from: v.string(),
+  to: v.string(),
+  relation: v.optional(v.picklist(["calls", "uses", "references", "depends_on"])),
+  rationale: v.optional(v.string()),
+});
+
 export const ConfigSchema = v.object({
   ignore: v.optional(v.array(v.string())),
   limits: v.optional(LimitsSchema),
@@ -92,6 +99,9 @@ export const ConfigSchema = v.object({
   developer: v.optional(DeveloperSchema),
   secretPatterns: v.optional(v.array(v.string())),
   suppressions: v.optional(v.array(SuppressionSchema)),
+  /** Explicit, reviewable links for dependencies static parsing cannot see
+   * (HTTP, queues, RPC, generated clients, and cross-language boundaries). */
+  relationships: v.optional(v.array(DeclaredRelationshipSchema)),
 });
 
 export type NodeNetConfig = v.InferOutput<typeof ConfigSchema>;
@@ -112,6 +122,7 @@ export interface LoadedConfig {
   developer: { handle?: string; team?: string };
   secretPatterns: string[];
   suppressions: Suppression[];
+  relationships: Array<{ from: string; to: string; relation: "calls" | "uses" | "references" | "depends_on"; rationale?: string }>;
 }
 
 type AuthorityConfidence = "AUTHORITATIVE" | "DECLARED" | "INFERRED" | "UNKNOWN";
@@ -145,6 +156,7 @@ export function defaultConfig(): LoadedConfig {
     developer: {},
     secretPatterns: [...SECRET_PATTERNS.map((r) => r.source)],
     suppressions: [],
+    relationships: [],
   };
 }
 
@@ -239,6 +251,12 @@ function applyDefaults(raw: v.InferOutput<typeof ConfigSchema>): LoadedConfig {
       createdAt: s.createdAt,
       ...(s.expiresAt !== undefined ? { expiresAt: s.expiresAt } : {}),
     })),
+    relationships: (raw.relationships ?? []).map((relationship) => ({
+      from: relationship.from,
+      to: relationship.to,
+      relation: relationship.relation ?? "depends_on",
+      ...(relationship.rationale ? { rationale: relationship.rationale } : {}),
+    })),
   };
 }
 
@@ -292,6 +310,7 @@ export function writeConfigTemplate(root: string): void {
       },
       overrides: [],
     },
+    relationships: [],
   };
   fs.writeFileSync(path.join(root, "nodenet.config.json"), JSON.stringify(template, null, 2) + "\n");
 }

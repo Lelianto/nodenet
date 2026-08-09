@@ -27,6 +27,27 @@ export interface AskResult {
   suggestedNext: string[];
 }
 
+export interface LeanAskResult {
+  queryId: string;
+  intent: AskResult["intent"];
+  primaryFiles: string[];
+  supportingFiles: string[];
+  recommendedFiles: string[];
+  suggestedNext: string[];
+}
+
+/** Default wire projection. Use the full AskResult only for interactive explanation/debugging. */
+export function leanAskResult(result: AskResult): LeanAskResult {
+  return {
+    queryId: result.queryId,
+    intent: result.intent,
+    primaryFiles: result.primaryFiles.map((file) => file.path),
+    supportingFiles: result.supportingFiles.map((file) => file.path),
+    recommendedFiles: [...result.recommendedFiles],
+    suggestedNext: [...result.suggestedNext],
+  };
+}
+
 export interface AffectedResult { target: AskMatch; depth: number; affected: AskMatch[]; truncated: boolean }
 
 export function askGraph(graph: Graph, question: string, limit = 30): AskResult {

@@ -4,13 +4,14 @@ import path from "node:path";
 import crypto from "node:crypto";
 import type { McpContext } from "./server.js";
 import { containsSecrets } from "../security/secrets.js";
-import { estimateTokens, DEFAULT_CONTEXT_TOKEN_BUDGET, MAX_CONTEXT_TOKEN_BUDGET } from "../ai/context-builder.js";
+import { DEFAULT_CONTEXT_TOKEN_BUDGET, MAX_CONTEXT_TOKEN_BUDGET } from "../ai/context-builder.js";
 import { loadFingerprints } from "../storage/storage.js";
 
 export interface SecuredOutput {
   text: string;
   structuredContent?: Record<string, unknown>;
   estimatedTokens: number;
+  emittedTokens: number;
   truncated: boolean;
 }
 
@@ -28,20 +29,20 @@ export function secureToolOutput(text: string, options: OutputSecurityOptions = 
     throw new Error("Output blocked by the secret-disclosure control.");
   }
   const budgetTokens = normalizeBudget(options.budgetTokens);
-  const estimatedTokens = estimateTokens(text);
   let value = text;
   let parsedValue: unknown;
   try {
     parsedValue = JSON.parse(text) as unknown;
     parsedValue = sanitizeValue(parsedValue);
-    value = JSON.stringify(parsedValue, null, 2);
+    value = JSON.stringify(parsedValue);
   } catch { /* compatibility text is not structured JSON */ }
   if (parsedValue === undefined) value = escapeUnicodeControls(text);
+  const estimatedTokens = Math.ceil(Buffer.byteLength(value) / 4);
   const structuredContent = parsedValue !== undefined
     ? evidenceEnvelope(parsedValue, options.toolName)
     : undefined;
   if (estimatedTokens <= budgetTokens) {
-    return { text: value, estimatedTokens, truncated: false, ...(structuredContent ? { structuredContent } : {}) };
+    return { text: value, estimatedTokens, emittedTokens: Math.ceil(Buffer.byteLength(value) / 4), truncated: false, ...(structuredContent ? { structuredContent } : {}) };
   }
   if (options.failOnOverflow) {
     throw new Error(`Output exceeds the hard ${budgetTokens}-token security limit; narrow the request.`);
@@ -56,9 +57,9 @@ export function secureToolOutput(text: string, options: OutputSecurityOptions = 
     omittedCharacters: Math.max(0, text.length - maxChars),
     preview: text.slice(0, maxChars),
   };
-  value = JSON.stringify(bounded, null, 2);
+  value = JSON.stringify(bounded);
   if (hasSecret(value, options.secretPatterns)) throw new Error("Output blocked by the secret-disclosure control.");
-  return { text: value, structuredContent: evidenceEnvelope(bounded, options.toolName), estimatedTokens, truncated: true };
+  return { text: value, structuredContent: evidenceEnvelope(bounded, options.toolName), estimatedTokens, emittedTokens: Math.ceil(Buffer.byteLength(value) / 4), truncated: true };
 }
 
 const DANGEROUS_UNICODE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g;

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Know what changes. Know what it affects. Know who should review it.</strong>
+  <strong>Governance-aware repository intelligence for AI agents.</strong>
 </p>
 
 <p align="center">
@@ -20,15 +20,18 @@
   <a href="https://github.com/Lelianto/nodenet"><img src="https://img.shields.io/github/stars/Lelianto/nodenet?style=social" alt="GitHub stars" /></a>
 </p>
 
-AI coding agents can understand code. But software is more than code —
+AI coding agents can search code. They do not automatically know which rules
+govern a change, who owns it, what its blast radius is, or when human approval
+is mandatory. Software is more than code —
 architecture decisions, business rules, ownership boundaries, security
 policies, and team responsibilities determine whether a change should be made
 and who should review it.
 
-**NodeNet maps code, living context, ownership and authority into one
-explainable graph, then answers deterministically what a change breaks and who
-must review it** — locally and without an AI or vector store. Network access is
-reserved for workflows that explicitly integrate with services such as GitHub.
+**NodeNet connects code structure, living context, ownership, authority, and
+the actual Git change so an AI agent can route work, respect constraints, and
+request the right review before changing code.** It is deterministic,
+local-first, and requires no LLM or vector store for core analysis. Network
+access is reserved for explicit integrations such as GitHub.
 
 It is the practical reference implementation of **Living Context Driven
 Development (LCDD)** — context treated as a living, versioned, governed
@@ -43,6 +46,7 @@ artifact ([living-context-driven-development](https://github.com/Lelianto/living
 - [How it works](#how-it-works)
 - [See it in action](#see-it-in-action)
 - [Why NodeNet (vs Graphify & co)](#why-nodenet-vs-graphify--co)
+- [Measured evidence](#measured-evidence)
 - [Requirements](#requirements)
 - [Install](#install)
 - [Quick start](#quick-start)
@@ -67,7 +71,7 @@ artifact ([living-context-driven-development](https://github.com/Lelianto/living
 | Capability | What you get |
 | --- | --- |
 | **Explainable code graph** | Typed nodes + edges with provenance — every connection says *why* it exists |
-| **Token-efficient repository intelligence** | File-ranked `ask` (`primary` → `supporting` → expansion), hypothetical `affected`, progressive MSC, and safe code/docs/media candidates keep AI retrieval scoped |
+| **Bounded repository intelligence** | Lean file-ranked `ask`, hypothetical `affected`, and progressive `route` → `map` → `evidence` → `source` context keep governed retrieval scoped |
 | **Living context** | Rules (business, security, compliance) as versioned artifacts with a lifecycle and freshness decay |
 | **Ownership & authority** | Who owns code, who approves changes, ranked from LCDD > NodeNet > CODEOWNERS > git history |
 | **Change impact** | A git diff becomes a symbol-level report: severity, affected code, ownership boundaries |
@@ -78,15 +82,16 @@ artifact ([living-context-driven-development](https://github.com/Lelianto/living
 | **Interactive visualization** | Force-directed `graph.html` with communities, search, and filters — plus static SVG export |
 | **Local-first & deterministic** | Core analysis uses no LLM, vector store, network, or repository-code execution; identical input produces identical output |
 
-Latest reproducible results: [initial benchmark report](docs/benchmark-results-2026-08-09.md)
-and [self-repository E2E dogfooding](docs/e2e-self-benchmark-2026-08-09.md).
+Latest reproducible evidence: [medium-repository feature verification and live
+A/B](docs/experiments/nodenet-ab-medium-feature-verification-2026-08-09.md),
+[self-repository E2E dogfooding](docs/e2e-self-benchmark-2026-08-09.md), and
+the [governed-change A/B protocol](docs/experiments/governed-change-ab-protocol.md).
 
-NodeNet deliberately has two product layers. **Repository Intelligence** helps
-AI understand code and declared context with fewer reads and fewer tokens.
-**Change Governance** turns that understanding into explainable impact,
-required approvals, and `pass` / `warn` / `block` decisions. Token reduction is
-measured together with task success and mandatory-context recall; it is never
-allowed to hide required governance.
+NodeNet has three product outcomes: **Route** to the smallest relevant change
+surface, **Govern** with applicable constraints and authority, and **Verify**
+the real diff for impact and reviewers. Token efficiency is a constraint, not
+the primary promise: required governance is never hidden to make a payload
+look smaller.
 
 Media files are indexed as local, non-authoritative retrieval candidates. An
 optional bounded `<media-file>.nodenet.json` sidecar may provide a `summary` and
@@ -188,13 +193,36 @@ the job: **governing how code changes**.
 | **Merge-policy gating on hardened/mandatory rules** | ✅ | ❌ |
 | **AI context bundles, secret-scanned** | ✅ | ❌ |
 | Multi-language parsing | 10 languages: 7 full + 3 basic | 36+ |
-| ADR/OpenAPI/SQL/Terraform ingestion | ✅ deterministic | ✅ |
+| Markdown/ADR/OpenAPI/SQL/Terraform ingestion | ✅ deterministic | ✅ |
 
 **NodeNet is the governance layer for AI-driven development.** It answers
 *"who decides, and what may an AI agent change?"* — not just *"what is
 connected?"* It treats rules as living, owned, approved artifacts, and it can
 automate review requests and CI gating from that governance. Graphify helps AI
 understand code; NodeNet helps teams keep code changeable, safely.
+
+## Measured evidence
+
+The latest medium-repository verification used 1,236 graph nodes, six living
+contexts, frozen hidden acceptance tests, and real `cl100k`/`o200k` tokenizer
+counts. These are observed results, not universal guarantees:
+
+| Measurement | Observed result |
+| --- | ---: |
+| Lean `ask` vs full graph result | **130 vs 5,338 tokens** (o200k), identical recommended files |
+| Governed `route` context | **157 tokens** (o200k) |
+| Progressive evidence | route 157 → map 716 → evidence 842 tokens |
+| Deterministic retrieval evaluation | **10/10 gates**, 100% mandatory-context recall |
+| Live medium-repo task A/B (n=1) | control ~1,028 vs NodeNet ~1,129 task-input tokens; both acceptance and regression suites passed |
+| Retrieval quality in that live task | direct target, zero decoys, plus impact/reviewer evidence |
+
+The honest conclusion is that NodeNet reduces exploration waste and adds
+governance evidence. It does **not** yet claim universal end-to-end token
+savings or a repository-size break-even threshold. A public task-token claim
+is gated on at least ten identical paired tasks, provider telemetry, quality
+non-inferiority, 100% mandatory-context/reviewer recall, and a bootstrap 95%
+confidence interval. See the [positioning](docs/product-positioning.md) and
+[A/B protocol](docs/experiments/governed-change-ab-protocol.md).
 
 ## Requirements
 
@@ -206,7 +234,7 @@ understand code; NodeNet helps teams keep code changeable, safely.
 ## Install
 
 ```bash
-npm install -g @antihero/nodenet     # from npm
+npm install -g @antihero/nodenet@beta
 ```
 
 Or from source:
@@ -232,17 +260,23 @@ nodenet graph     # interactive visualization (.nodenet/graph.html)
 nodenet init             # creates nodenet.config.json + .nodenet/
 nodenet build            # scan, parse, analyze, persist the unified graph
 nodenet query PaymentService
-nodenet ask "what connects checkout to settlement?"
+nodenet ask "what connects checkout to settlement?" --json # lean routing default
+nodenet ask "what connects checkout to settlement?" --full --json
 nodenet affected PaymentService --depth 2
 nodenet trace LoginForm AuthService
 nodenet governed-by PaymentService
 nodenet owner src/payment/PaymentService.ts
-nodenet context "modify payment settlement"   # AI context bundle
+nodenet owner src/payment/PaymentService.ts --explain
+nodenet context PaymentService --detail route  # files + owner + governance
+nodenet context PaymentService --detail evidence
 nodenet context PaymentService --detail source # bounded, secret-scanned snippets
 nodenet impact --base main                    # analyze the current change
 nodenet reviewers --base main                 # who should review it
 nodenet report                                # highlights: god nodes, communities, governance
 nodenet health                                # context health report
+nodenet health --uncovered                    # list files missing ownership
+nodenet snapshot -o .nodenet/snapshot.json   # record graph state for CI
+nodenet diff-snapshot .nodenet/snapshot.json # exit 2 when graph drift exists
 nodenet graph                                 # interactive HTML visualization
 nodenet graph --change --base main            # overlay impact + governance decision
 nodenet graph -f svg -o graph.svg             # static SVG image
@@ -253,9 +287,9 @@ nodenet serve --token "$TOKEN" --scopes graph:read,context:read
 ```
 
 Incremental builds reuse unchanged local parse results. Built-in deterministic
-adapters cover ten major languages. Governance-relevant ADR
-Markdown, OpenAPI, SQL schemas, and Terraform resources are added to the same
-graph without an LLM or paid service. Every relationship is classified as
+adapters cover ten major languages. Every Markdown file (README, guides, ADRs,
+RFCs, docs), OpenAPI specs, SQL schemas, and Terraform resources is added to
+the same graph without an LLM or paid service. Every relationship is classified as
 `EXTRACTED`, `DECLARED`, `INFERRED`, `AMBIGUOUS`, or `OBSERVED`.
 
 | Support | Languages | Extraction contract |
@@ -282,20 +316,22 @@ the full option reference.
 | `update` | Incremental rebuild from changed files (fingerprint-based) |
 | `watch` | Rebuild on file changes |
 | `query <name>` | Find nodes by name |
-| `ask <question>` | Intent-aware scoped graph retrieval with recommended files and next queries |
+| `ask <question>` | Lean intent-aware routing; add `--full` for matches, connections, and ranking evidence |
 | `affected <target>` | Hypothetical graph blast radius before a change exists |
 | `related <name>` | Show direct neighbors of a node |
 | `trace <from> <to>` | Shortest explainable path between two nodes |
-| `context [target]` | List contexts or build progressive `map`, `evidence`, or bounded `source` MSC output |
+| `context [target]` | List contexts or build progressive `route`, `map`, `evidence`, or bounded `source` MSC output; `--compat v1` restores the beta.1 wire shape |
 | `feedback --query-id ... --outcome ...` | Record local opt-in retrieval outcomes without changing authority |
 | `explain <name>` | A node and every relationship with provenance |
-| `owner <path-or-symbol>` | Who owns a file or symbol (source + confidence) |
+| `owner <path-or-symbol> [--explain]` | Who owns a file or symbol, optionally with the full resolution chain |
 | `governed-by <name>` | Living contexts governing a node |
 | `impact [--base <ref>]` | Analyze the current change (git diff) for impact |
 | `reviewers [--base <ref>]` | Resolve reviewers (suggested / required / authorityRequired) |
 | `conflicts` | List conflicting living contexts |
-| `health` | Living context health report |
+| `health [--uncovered]` | Living context health report, optionally listing files without ownership |
 | `report` | Deterministic highlights report: god nodes, surprising connections, communities, governance, suggested questions |
+| `snapshot [-o <file>]` | Persist a stable, sorted graph snapshot for CI |
+| `diff-snapshot <file>` | Compare the current graph with a snapshot; exit `2` on drift |
 | `graph [-o <file>] [-f html\|svg]` | Generate an interactive HTML viewer or static SVG image with communities |
 | `open [--change] [--base <ref>]` | Open the interactive graph in one command and hot-reload when repository files change |
 | `languages [--json]` | Show the ten-language support tier and capability matrix |
@@ -309,7 +345,7 @@ the full option reference.
 | `eval run` | Replay NodeNet safely against exact historical base/head commits |
 | `eval label` | Open the loopback-only blind-labeling Decision Lab |
 | `eval report` / `eval gate` | Compare labels with replay decisions and enforce quality thresholds |
-| `doctor [--json]` | Report a 0–100 activation-readiness score with remediation steps |
+| `doctor [--json] [--fix]` | Report readiness and optionally install safe missing starter/workflow files |
 | `github pr [options]` | Analyze a PR; update an idempotent Check Run, comment, request reviewers, and audit the decision |
 | `mcp` | Run the MCP server over stdio for AI assistants |
 | `serve [--host] [--port] [--token] [--scopes] [--rate-capacity] [--rate-refill] [--reload-interval] [--no-reload]` | MCP Streamable HTTP with sessions, scopes, rate limits, and atomic reload |
@@ -389,14 +425,26 @@ only** — never executable code, and it is runtime-validated on every load:
     },
     "overrides": []
   },
-  "developer": { "handle": "your-gh-handle", "team": "checkout-team" }
+  "developer": { "handle": "your-gh-handle", "team": "checkout-team" },
+  "relationships": [
+    {
+      "from": "CheckoutApi.submit",
+      "to": "SettlementProcessor.settle",
+      "relation": "calls",
+      "rationale": "POST /payments is implemented by the Python settlement service"
+    }
+  ]
 }
 ```
 
 Key sections: `ignore`, `limits` (resource limits that fail safely),
 `reviewPolicy` (severity → action), `contextFreshness` (decay durations),
 `ownership.teams` + `ownership.overrides`, `developer`, `secretPatterns` and
-`suppressions`. Schema reference: [src/config/config.ts](src/config/config.ts).
+`suppressions`, and `relationships`. Declared relationships model boundaries
+that static parsing cannot observe (HTTP, queues, RPC, generated clients, and
+cross-language calls). They retain `config` provenance and are never inferred
+merely because two files share a governance context. Schema reference:
+[src/config/config.ts](src/config/config.ts).
 
 ## GitHub pull-request integration
 
@@ -456,7 +504,9 @@ graph, living context, ownership, authority, impact and reviewers as tools for
 AI coding assistants (Claude Code, Codex, and any MCP client):
 
 ```bash
-nodenet mcp
+nodenet mcp                       # core retrieval preset
+nodenet mcp --tools governance    # governance-focused schemas
+nodenet mcp --tools all           # complete tool surface
 ```
 
 Tools: `ask`, `affected`, `query`, `related`, `trace`, `context` (Minimum Sufficient Context —
@@ -540,12 +590,20 @@ See [SECURITY.md](SECURITY.md) and
   Decision Lab, metrics, and regression gates
 - [Verified overrides](docs/verified-overrides.md) — numeric GitHub identity,
   RBAC scope, and signed override verification
+- [Product positioning](docs/product-positioning.md) — supported promise,
+  evidence boundaries, and competitive frame
+- [Token-efficient defaults](docs/token-efficiency-v2.md) — lean output,
+  profiles, accounting, and compatibility
+- [Governed-change A/B protocol](docs/experiments/governed-change-ab-protocol.md) —
+  paired task design and publishable-claim gates
 
 ## Testing
 
 ```bash
 npm run typecheck
 npm test
+npm run build
+npm pack --dry-run
 ```
 
 Tests cover the declared extraction contract for all ten supported languages,

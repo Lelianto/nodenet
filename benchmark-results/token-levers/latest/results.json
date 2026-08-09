@@ -1,0 +1,723 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-08-09T14:54:29.900Z",
+  "repository": "NodeNet self-repository",
+  "graph": {
+    "nodes": 1103,
+    "edges": 1820,
+    "builtAt": "2026-08-09T10:30:48.085Z"
+  },
+  "estimator": "bytes / 4 (same estimator as src/ai/context-builder.ts estimateTokens)",
+  "contextCases": [
+    {
+      "target": "buildContextBundle",
+      "resolvedTarget": "buildContextBundle() @ src/ai/context-builder.ts:105",
+      "evidenceItems": 19,
+      "reportedEstimatedTokens": 2007,
+      "budgetTokens": 2000,
+      "budgetExceeded": true,
+      "bytes": {
+        "prettyDefault": 9853,
+        "compactDefault": 8029,
+        "compactNoCodeContext": 7084,
+        "compactNoSelectionReason": 6192,
+        "compactTier1": 5247,
+        "profileMap": 4468,
+        "profileRoute": 494
+      },
+      "tokens": {
+        "prettyDefault": 2464,
+        "compactDefault": 2008,
+        "compactNoCodeContext": 1771,
+        "compactNoSelectionReason": 1548,
+        "compactTier1": 1312,
+        "profileMap": 1117,
+        "profileRoute": 124
+      },
+      "fieldBytes": {
+        "codeContext": 930,
+        "selectionReason": 1438,
+        "codeEvidence": 6446,
+        "governanceCore": 359
+      },
+      "savings": {
+        "prettyToCompact": 0.1851,
+        "noCodeContext": 0.1177,
+        "noSelectionReason": 0.2288,
+        "tier1": 0.3465,
+        "tier1VsPretty": 0.4675,
+        "profileMap": 0.4435,
+        "profileRoute": 0.9385
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "askGraph",
+      "resolvedTarget": "askGraph() @ src/ai/retrieval.ts:32",
+      "evidenceItems": 20,
+      "reportedEstimatedTokens": 1906,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 9530,
+        "compactDefault": 7627,
+        "compactNoCodeContext": 6837,
+        "compactNoSelectionReason": 5699,
+        "compactTier1": 4909,
+        "profileMap": 4093,
+        "profileRoute": 465
+      },
+      "tokens": {
+        "prettyDefault": 2383,
+        "compactDefault": 1907,
+        "compactNoCodeContext": 1710,
+        "compactNoSelectionReason": 1425,
+        "compactTier1": 1228,
+        "profileMap": 1024,
+        "profileRoute": 117
+      },
+      "fieldBytes": {
+        "codeContext": 775,
+        "selectionReason": 1508,
+        "codeEvidence": 6227,
+        "governanceCore": 353
+      },
+      "savings": {
+        "prettyToCompact": 0.1997,
+        "noCodeContext": 0.1036,
+        "noSelectionReason": 0.2528,
+        "tier1": 0.3564,
+        "tier1VsPretty": 0.4849,
+        "profileMap": 0.4634,
+        "profileRoute": 0.939
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "attachRepositoryArtifacts",
+      "resolvedTarget": "attachRepositoryArtifacts() @ src/analyzer/artifacts.ts:14",
+      "evidenceItems": 10,
+      "reportedEstimatedTokens": 1118,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 5631,
+        "compactDefault": 4475,
+        "compactNoCodeContext": 4056,
+        "compactNoSelectionReason": 3512,
+        "compactTier1": 3093,
+        "profileMap": 2676,
+        "profileRoute": 740
+      },
+      "tokens": {
+        "prettyDefault": 1408,
+        "compactDefault": 1119,
+        "compactNoCodeContext": 1014,
+        "compactNoSelectionReason": 878,
+        "compactTier1": 774,
+        "profileMap": 669,
+        "profileRoute": 185
+      },
+      "fieldBytes": {
+        "codeContext": 404,
+        "selectionReason": 753,
+        "codeEvidence": 3171,
+        "governanceCore": 599
+      },
+      "savings": {
+        "prettyToCompact": 0.2053,
+        "noCodeContext": 0.0936,
+        "noSelectionReason": 0.2152,
+        "tier1": 0.3088,
+        "tier1VsPretty": 0.4507,
+        "profileMap": 0.402,
+        "profileRoute": 0.8346
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "authorityRank",
+      "resolvedTarget": "authorityRank() @ src/authority/authority.ts:26",
+      "evidenceItems": 8,
+      "reportedEstimatedTokens": 959,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 4710,
+        "compactDefault": 3835,
+        "compactNoCodeContext": 3417,
+        "compactNoSelectionReason": 3049,
+        "compactTier1": 2631,
+        "profileMap": 2293,
+        "profileRoute": 491
+      },
+      "tokens": {
+        "prettyDefault": 1178,
+        "compactDefault": 959,
+        "compactNoCodeContext": 855,
+        "compactNoSelectionReason": 763,
+        "compactTier1": 658,
+        "profileMap": 574,
+        "profileRoute": 123
+      },
+      "fieldBytes": {
+        "codeContext": 403,
+        "selectionReason": 618,
+        "codeEvidence": 2783,
+        "governanceCore": 360
+      },
+      "savings": {
+        "prettyToCompact": 0.1858,
+        "noCodeContext": 0.109,
+        "noSelectionReason": 0.205,
+        "tier1": 0.314,
+        "tier1VsPretty": 0.4414,
+        "profileMap": 0.4021,
+        "profileRoute": 0.872
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "loadConfig",
+      "resolvedTarget": "loadConfig() @ src/config/config.ts:151",
+      "evidenceItems": 19,
+      "reportedEstimatedTokens": 1830,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 9131,
+        "compactDefault": 7323,
+        "compactNoCodeContext": 6555,
+        "compactNoSelectionReason": 5498,
+        "compactTier1": 4730,
+        "profileMap": 3958,
+        "profileRoute": 471
+      },
+      "tokens": {
+        "prettyDefault": 2283,
+        "compactDefault": 1831,
+        "compactNoCodeContext": 1639,
+        "compactNoSelectionReason": 1375,
+        "compactTier1": 1183,
+        "profileMap": 990,
+        "profileRoute": 118
+      },
+      "fieldBytes": {
+        "codeContext": 753,
+        "selectionReason": 1426,
+        "codeEvidence": 5939,
+        "governanceCore": 354
+      },
+      "savings": {
+        "prettyToCompact": 0.198,
+        "noCodeContext": 0.1049,
+        "noSelectionReason": 0.2492,
+        "tier1": 0.3541,
+        "tier1VsPretty": 0.482,
+        "profileMap": 0.4595,
+        "profileRoute": 0.9357
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "adaptLcddContext",
+      "resolvedTarget": "adaptLcddContext() @ src/context/lcdd.ts:75",
+      "evidenceItems": 10,
+      "reportedEstimatedTokens": 1047,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 5231,
+        "compactDefault": 4190,
+        "compactNoCodeContext": 3762,
+        "compactNoSelectionReason": 3233,
+        "compactTier1": 2805,
+        "profileMap": 2390,
+        "profileRoute": 473
+      },
+      "tokens": {
+        "prettyDefault": 1308,
+        "compactDefault": 1048,
+        "compactNoCodeContext": 941,
+        "compactNoSelectionReason": 809,
+        "compactTier1": 702,
+        "profileMap": 598,
+        "profileRoute": 119
+      },
+      "fieldBytes": {
+        "codeContext": 413,
+        "selectionReason": 747,
+        "codeEvidence": 3144,
+        "governanceCore": 353
+      },
+      "savings": {
+        "prettyToCompact": 0.199,
+        "noCodeContext": 0.1021,
+        "noSelectionReason": 0.2284,
+        "tier1": 0.3305,
+        "tier1VsPretty": 0.4638,
+        "profileMap": 0.4296,
+        "profileRoute": 0.8871
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "scoreBenchmark",
+      "resolvedTarget": "scoreBenchmark() @ src/evaluation/benchmark.ts:40",
+      "evidenceItems": 9,
+      "reportedEstimatedTokens": 1078,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 5410,
+        "compactDefault": 4315,
+        "compactNoCodeContext": 3901,
+        "compactNoSelectionReason": 3435,
+        "compactTier1": 3021,
+        "profileMap": 2643,
+        "profileRoute": 766
+      },
+      "tokens": {
+        "prettyDefault": 1353,
+        "compactDefault": 1079,
+        "compactNoCodeContext": 976,
+        "compactNoSelectionReason": 859,
+        "compactTier1": 756,
+        "profileMap": 661,
+        "profileRoute": 192
+      },
+      "fieldBytes": {
+        "codeContext": 399,
+        "selectionReason": 691,
+        "codeEvidence": 2991,
+        "governanceCore": 632
+      },
+      "savings": {
+        "prettyToCompact": 0.2024,
+        "noCodeContext": 0.0959,
+        "noSelectionReason": 0.2039,
+        "tier1": 0.2999,
+        "tier1VsPretty": 0.4416,
+        "profileMap": 0.3875,
+        "profileRoute": 0.8225
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "analyzeImpact",
+      "resolvedTarget": "analyzeImpact() @ src/change/impact.ts:78",
+      "evidenceItems": 6,
+      "reportedEstimatedTokens": 769,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 3917,
+        "compactDefault": 3075,
+        "compactNoCodeContext": 2825,
+        "compactNoSelectionReason": 2479,
+        "compactTier1": 2229,
+        "profileMap": 1970,
+        "profileRoute": 744
+      },
+      "tokens": {
+        "prettyDefault": 980,
+        "compactDefault": 769,
+        "compactNoCodeContext": 707,
+        "compactNoSelectionReason": 620,
+        "compactTier1": 558,
+        "profileMap": 493,
+        "profileRoute": 186
+      },
+      "fieldBytes": {
+        "codeContext": 235,
+        "selectionReason": 470,
+        "codeEvidence": 1938,
+        "governanceCore": 625
+      },
+      "savings": {
+        "prettyToCompact": 0.215,
+        "noCodeContext": 0.0813,
+        "noSelectionReason": 0.1938,
+        "tier1": 0.2751,
+        "tier1VsPretty": 0.4309,
+        "profileMap": 0.3593,
+        "profileRoute": 0.758
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "resolveReviewers",
+      "resolvedTarget": "resolveReviewers() @ src/review/resolver.ts:32",
+      "evidenceItems": 5,
+      "reportedEstimatedTokens": 671,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 3439,
+        "compactDefault": 2684,
+        "compactNoCodeContext": 2479,
+        "compactNoSelectionReason": 2198,
+        "compactTier1": 1993,
+        "profileMap": 1774,
+        "profileRoute": 753
+      },
+      "tokens": {
+        "prettyDefault": 860,
+        "compactDefault": 671,
+        "compactNoCodeContext": 620,
+        "compactNoSelectionReason": 550,
+        "compactTier1": 499,
+        "profileMap": 444,
+        "profileRoute": 189
+      },
+      "fieldBytes": {
+        "codeContext": 190,
+        "selectionReason": 381,
+        "codeEvidence": 1583,
+        "governanceCore": 627
+      },
+      "savings": {
+        "prettyToCompact": 0.2195,
+        "noCodeContext": 0.0764,
+        "noSelectionReason": 0.1811,
+        "tier1": 0.2575,
+        "tier1VsPretty": 0.4205,
+        "profileMap": 0.339,
+        "profileRoute": 0.7194
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "secureToolOutput",
+      "resolvedTarget": "secureToolOutput() @ src/mcp/security.ts:25",
+      "evidenceItems": 17,
+      "reportedEstimatedTokens": 1735,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 8701,
+        "compactDefault": 6944,
+        "compactNoCodeContext": 6242,
+        "compactNoSelectionReason": 5304,
+        "compactTier1": 4602,
+        "profileMap": 3909,
+        "profileRoute": 775
+      },
+      "tokens": {
+        "prettyDefault": 2176,
+        "compactDefault": 1736,
+        "compactNoCodeContext": 1561,
+        "compactNoSelectionReason": 1326,
+        "compactTier1": 1151,
+        "profileMap": 978,
+        "profileRoute": 194
+      },
+      "fieldBytes": {
+        "codeContext": 687,
+        "selectionReason": 1283,
+        "codeEvidence": 5322,
+        "governanceCore": 655
+      },
+      "savings": {
+        "prettyToCompact": 0.2019,
+        "noCodeContext": 0.1011,
+        "noSelectionReason": 0.2362,
+        "tier1": 0.3373,
+        "tier1VsPretty": 0.4711,
+        "profileMap": 0.4371,
+        "profileRoute": 0.8884
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "buildGovernanceDecision",
+      "resolvedTarget": "buildGovernanceDecision() @ src/governance/decision.ts:64",
+      "evidenceItems": 9,
+      "reportedEstimatedTokens": 1136,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 5647,
+        "compactDefault": 4544,
+        "compactNoCodeContext": 4068,
+        "compactNoSelectionReason": 3662,
+        "compactTier1": 3186,
+        "profileMap": 2809,
+        "profileRoute": 772
+      },
+      "tokens": {
+        "prettyDefault": 1412,
+        "compactDefault": 1136,
+        "compactNoCodeContext": 1017,
+        "compactNoSelectionReason": 916,
+        "compactTier1": 797,
+        "profileMap": 703,
+        "profileRoute": 193
+      },
+      "fieldBytes": {
+        "codeContext": 461,
+        "selectionReason": 693,
+        "codeEvidence": 3152,
+        "governanceCore": 631
+      },
+      "savings": {
+        "prettyToCompact": 0.1953,
+        "noCodeContext": 0.1048,
+        "noSelectionReason": 0.1941,
+        "tier1": 0.2989,
+        "tier1VsPretty": 0.4358,
+        "profileMap": 0.3818,
+        "profileRoute": 0.8301
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    },
+    {
+      "target": "estimateTokens",
+      "resolvedTarget": "estimateTokens() @ src/ai/context-builder.ts:230",
+      "evidenceItems": 18,
+      "reportedEstimatedTokens": 1941,
+      "budgetTokens": 2000,
+      "budgetExceeded": false,
+      "bytes": {
+        "prettyDefault": 9511,
+        "compactDefault": 7766,
+        "compactNoCodeContext": 6825,
+        "compactNoSelectionReason": 6046,
+        "compactTier1": 5105,
+        "profileMap": 4375,
+        "profileRoute": 490
+      },
+      "tokens": {
+        "prettyDefault": 2378,
+        "compactDefault": 1942,
+        "compactNoCodeContext": 1707,
+        "compactNoSelectionReason": 1512,
+        "compactTier1": 1277,
+        "profileMap": 1094,
+        "profileRoute": 123
+      },
+      "fieldBytes": {
+        "codeContext": 926,
+        "selectionReason": 1342,
+        "codeEvidence": 6191,
+        "governanceCore": 359
+      },
+      "savings": {
+        "prettyToCompact": 0.1835,
+        "noCodeContext": 0.1212,
+        "noSelectionReason": 0.2215,
+        "tier1": 0.3426,
+        "tier1VsPretty": 0.4633,
+        "profileMap": 0.4366,
+        "profileRoute": 0.9369
+      },
+      "lossless": {
+        "codeContextDuplicatesEvidenceLabels": true,
+        "selectionReasonDerivable": true
+      }
+    }
+  ],
+  "contextSummary": {
+    "cases": 12,
+    "medianTier1Saving": 0.3223,
+    "minTier1Saving": 0.2575,
+    "maxTier1Saving": 0.3564,
+    "casesAboveQuarterSaving": 12,
+    "medianPrettyToCompact": 0.1993,
+    "medianProfileMapSaving": 0.4158,
+    "medianProfileRouteSaving": 0.8796,
+    "medianReportedTokens": 1127,
+    "medianEmittedTokens": 1410,
+    "medianTier1Tokens": 785.5,
+    "medianRouteTokens": 154.5,
+    "budgetExceededCases": 1,
+    "losslessCases": 12
+  },
+  "askCases": [
+    {
+      "question": "how is the context bundle budget applied",
+      "matchCount": 30,
+      "connectionCount": 33,
+      "primaryFiles": [
+        "src/ai/context-builder.ts"
+      ],
+      "bytes": {
+        "prettyDefault": 22477,
+        "compactDefault": 17165,
+        "matches": 7724,
+        "connections": 5414,
+        "lean": 351
+      },
+      "tokens": {
+        "prettyDefault": 5620,
+        "compactDefault": 4292,
+        "matches": 1931,
+        "connections": 1354,
+        "lean": 88
+      },
+      "matchesAndConnectionsShare": 0.7654,
+      "savings": {
+        "leanVsCompact": 0.9796,
+        "leanVsPretty": 0.9844
+      },
+      "preservesRecommendedFiles": true
+    },
+    {
+      "question": "who reviews a governance change",
+      "matchCount": 30,
+      "connectionCount": 28,
+      "primaryFiles": [
+        "docs/concepts/review-governance.md",
+        "src/visualization/governance-map.ts"
+      ],
+      "bytes": {
+        "prettyDefault": 22098,
+        "compactDefault": 16921,
+        "matches": 7314,
+        "connections": 4731,
+        "lean": 538
+      },
+      "tokens": {
+        "prettyDefault": 5525,
+        "compactDefault": 4231,
+        "matches": 1829,
+        "connections": 1183,
+        "lean": 135
+      },
+      "matchesAndConnectionsShare": 0.7118,
+      "savings": {
+        "leanVsCompact": 0.9682,
+        "leanVsPretty": 0.9757
+      },
+      "preservesRecommendedFiles": true
+    },
+    {
+      "question": "how are living contexts loaded from disk",
+      "matchCount": 30,
+      "connectionCount": 24,
+      "primaryFiles": [
+        "docs/concepts/living-context.md"
+      ],
+      "bytes": {
+        "prettyDefault": 19694,
+        "compactDefault": 14922,
+        "matches": 7124,
+        "connections": 3788,
+        "lean": 370
+      },
+      "tokens": {
+        "prettyDefault": 4924,
+        "compactDefault": 3731,
+        "matches": 1781,
+        "connections": 947,
+        "lean": 93
+      },
+      "matchesAndConnectionsShare": 0.7313,
+      "savings": {
+        "leanVsCompact": 0.9752,
+        "leanVsPretty": 0.9812
+      },
+      "preservesRecommendedFiles": true
+    },
+    {
+      "question": "where is the MCP output secret scan",
+      "matchCount": 30,
+      "connectionCount": 28,
+      "primaryFiles": [
+        "src/mcp/security.ts",
+        "src/mcp/server.ts"
+      ],
+      "bytes": {
+        "prettyDefault": 20847,
+        "compactDefault": 15626,
+        "matches": 7230,
+        "connections": 4285,
+        "lean": 409
+      },
+      "tokens": {
+        "prettyDefault": 5212,
+        "compactDefault": 3907,
+        "matches": 1808,
+        "connections": 1072,
+        "lean": 103
+      },
+      "matchesAndConnectionsShare": 0.7369,
+      "savings": {
+        "leanVsCompact": 0.9738,
+        "leanVsPretty": 0.9804
+      },
+      "preservesRecommendedFiles": true
+    }
+  ],
+  "askSummary": {
+    "cases": 4,
+    "medianLeanSaving": 0.9745,
+    "medianMatchesAndConnectionsShare": 0.7341,
+    "medianEmittedTokens": 5368.5,
+    "medianLeanTokens": 98,
+    "casesPreservingRecommendedFiles": 4
+  },
+  "gates": {
+    "checks": [
+      {
+        "id": "tier1-breadth",
+        "detail": "Tier 1 saves >= 25% of compact bytes on >= 10 of 12 context targets",
+        "passed": true
+      },
+      {
+        "id": "tier1-lossless",
+        "detail": "codeContext duplicates evidence labels and selectionReason is derivable on every case",
+        "passed": true
+      },
+      {
+        "id": "ask-lean",
+        "detail": "Lean ask projection saves >= 90% of compact bytes (median)",
+        "passed": true
+      },
+      {
+        "id": "ask-lean-lossless",
+        "detail": "Lean ask projection preserves recommendedFiles on every case",
+        "passed": true
+      },
+      {
+        "id": "estimator-undercount",
+        "detail": "Reported estimatedTokens under-counts the emitted payload (documents the accounting bug)",
+        "passed": true
+      }
+    ],
+    "allPassed": true
+  }
+}

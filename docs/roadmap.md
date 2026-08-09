@@ -23,7 +23,7 @@ security.
 | Assistant skill install | ✅ Codex, Claude, Cursor, Agent Skills | demand-led additional platforms |
 | Auto-generated report (god nodes, surprising connections, suggested questions) | ✅ `nodenet report` | ✅ |
 | PR dashboard + merge-order conflict detection | ✅ local multi-ref `changes` | hosted dashboard |
-| Docs / markdown / ADR ingestion as graph nodes | ✅ ADR/OpenAPI/SQL/Terraform | richer cross-links |
+| Docs / markdown / ADR ingestion as graph nodes | ✅ all markdown + ADR/OpenAPI/SQL/Terraform | richer cross-links |
 | Git hook auto-rebuild + graph.json merge driver | ❌ | ✅ |
 | Decision benchmark harness | ✅ executable language, retrieval, governance, and historical evaluation | publish real pilot results |
 | README translations | 1 language | multiple |

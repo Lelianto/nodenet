@@ -65,12 +65,39 @@ describe("nodenet CLI", () => {
     expect(output).toContain("add");
   });
 
+  it("explains ownership provenance", async () => {
+    const repo = work("cross-team");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const result = captureStdout(() => runCli(["owner", "src/payment/PaymentService.ts", "--explain", "--json"], { cwd: repo }));
+    expect(await result.result).toBe(0);
+    const parsed = JSON.parse(result.output);
+    expect(parsed.matching.length).toBeGreaterThan(0);
+    expect(parsed.matching.some((record: { selected: boolean }) => record.selected)).toBe(true);
+  });
+
+  it("lists uncovered ownership paths", async () => {
+    const repo = work("basic-typescript");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const result = captureStdout(() => runCli(["health", "--uncovered", "--json"], { cwd: repo }));
+    expect(await result.result).toBe(0);
+    expect(Array.isArray(JSON.parse(result.output).unownedFiles)).toBe(true);
+  });
+
+  it("creates and compares deterministic graph snapshots", async () => {
+    const repo = work("basic-typescript");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    expect(await runCli(["snapshot", "--output", "snapshot.json", "--json"], { cwd: repo })).toBe(0);
+    const result = captureStdout(() => runCli(["diff-snapshot", "snapshot.json", "--json"], { cwd: repo }));
+    expect(await result.result).toBe(0);
+    expect(JSON.parse(result.output).changed).toBe(false);
+  });
+
   it("ask, affected, and progressive source context expose retrieval UX", async () => {
     const repo = work("cross-team");
     expect(await runCli(["build"], { cwd: repo })).toBe(0);
     const asked = captureStdout(() => runCli(["ask", "what connects checkout to payment", "--json"], { cwd: repo }));
     expect(await asked.result).toBe(0);
-    expect(JSON.parse(asked.output).matches.length).toBeGreaterThan(0);
+    expect(JSON.parse(asked.output).recommendedFiles.length).toBeGreaterThan(0);
     const affected = captureStdout(() => runCli(["affected", "PaymentService", "--json"], { cwd: repo }));
     expect(await affected.result).toBe(0);
     expect(JSON.parse(affected.output).affected.length).toBeGreaterThan(0);

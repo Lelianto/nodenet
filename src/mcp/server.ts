@@ -40,8 +40,9 @@ import { evidenceClassForSource } from "../graph/edges.js";
 import { captureFreshnessBaseline, secureToolOutput, staleInputs, type FreshnessFingerprint } from "./security.js";
 import { appendAudit } from "../storage/storage.js";
 import path from "node:path";
+import fs from "node:fs";
 import { McpSnapshotStore } from "./snapshot.js";
-import { askGraph, affectedByTarget } from "../ai/retrieval.js";
+import { askGraph, affectedByTarget, leanAskResult } from "../ai/retrieval.js";
 
 export const MCP_PROTOCOL_VERSION = "2024-11-05";
 import { NODENET_VERSION } from "../version.js";
@@ -79,12 +80,15 @@ export interface McpContext {
   auditEnabled?: boolean;
   authorization?: McpAuthorization;
   snapshotStore?: McpSnapshotStore;
+  toolPreset?: "core" | "governance" | "all";
+  tokenLogging?: boolean;
 }
 
 /** Prepare transport-level immutable freshness state before serving requests. */
 export function prepareMcpContext(ctx: McpContext): McpContext {
   ctx.snapshotStore ??= new McpSnapshotStore(ctx.config, ctx.state);
   ctx.freshnessBaseline ??= captureFreshnessBaseline(ctx);
+  ctx.tokenLogging ??= true;
   return ctx;
 }
 
@@ -109,7 +113,7 @@ const arrayOutput = () => ({ type: "array", "x-schemaVersion": "1" });
 const textOutput = () => ({ type: "string", "x-schemaVersion": "1" });
 
 function json(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(value);
 }
 
 function nodeRecord(node: GraphNode): Record<string, unknown> {
@@ -235,16 +239,19 @@ function describeCriticalReview(ctx: McpContext, base: string | undefined): stri
 
 function buildTools(ctx: McpContext): McpTool[] {
   const { graph, index, ownership, contexts } = ctx.state;
-  return [
+  const tools: McpTool[] = [
     {
       name: "ask",
       description: "Retrieve an intent-aware scoped subgraph for a natural-language repository question.",
       requiredScope: "graph:read",
-      outputSchema: objectOutput("queryId", "intent", "matches", "connections", "primaryFiles", "supportingFiles", "expansionCandidates", "recommendedFiles"),
-      inputSchema: schema({ question: strField("Natural-language repository question"), limit: optIntField("Maximum ranked matches", 1, 20, 5) }, ["question"]),
+      outputSchema: objectOutput("queryId", "intent", "primaryFiles", "supportingFiles", "recommendedFiles", "suggestedNext"),
+      inputSchema: schema({ question: strField("Natural-language repository question"), limit: optIntField("Maximum ranked matches", 1, 20, 5), include: optStrField("Set to full for matches, connections, and ranking explanations") }, ["question"]),
       // Keep the MCP default small enough to preserve the declared object
       // contract under the transport's output budget. Callers can expand it.
-      run: (args) => ok(json(askGraph(graph, String(args["question"] ?? ""), typeof args["limit"] === "number" ? args["limit"] : 5))),
+      run: (args) => {
+        const result = askGraph(graph, String(args["question"] ?? ""), typeof args["limit"] === "number" ? args["limit"] : 5);
+        return ok(json(args["include"] === "full" ? result : leanAskResult(result)));
+      },
     },
     {
       name: "affected",
@@ -342,7 +349,7 @@ function buildTools(ctx: McpContext): McpTool[] {
       outputSchema: objectOutput("target", "codeEvidence", "livingContext", "metrics"),
       inputSchema: schema({
         target: strField("Symbol name or file path"),
-        detail: { type: "string", enum: ["map", "evidence", "source"], description: "Progressive evidence detail" },
+        detail: { type: "string", enum: ["route", "map", "evidence", "source"], description: "Progressive field projection" },
         maxTokens: optIntField(
           "Advanced override for the automatic MSC output budget; required governance is always retained",
           MIN_CONTEXT_TOKEN_BUDGET,
@@ -358,7 +365,7 @@ function buildTools(ctx: McpContext): McpTool[] {
         if (ambiguous) return err(ambiguous);
         if (candidates.length === 0) return err(`No exact target matched "${target}". Use query to select a stable node id or exact path.`);
         const maxTokens = typeof args["maxTokens"] === "number" ? args["maxTokens"] : undefined;
-        const detail = ["map", "evidence", "source"].includes(String(args["detail"] ?? "evidence")) ? String(args["detail"] ?? "evidence") as "map" | "evidence" | "source" : "evidence";
+        const detail = ["route", "map", "evidence", "source"].includes(String(args["detail"] ?? "evidence")) ? String(args["detail"] ?? "evidence") as "route" | "map" | "evidence" | "source" : "evidence";
         const bundle = buildContextBundle(graph, index, ownership, contexts, candidates[0]!.id, { ...(maxTokens !== undefined ? { maxTokens } : {}), detail, ...(detail === "source" ? { root: ctx.root } : {}) });
         if (!bundle) return err(`No target matched "${target}". Try a symbol or file name.`);
         return ok(json(bundle));
@@ -467,6 +474,11 @@ function buildTools(ctx: McpContext): McpTool[] {
       },
     },
   ];
+  const preset = ctx.toolPreset ?? "all";
+  if (preset === "all") return tools;
+  const core = new Set(["ask", "affected", "query", "related", "trace", "context"]);
+  const governance = new Set(["context", "governed_by", "owner", "impact", "reviewers", "critical_review", "health"]);
+  return tools.filter((tool) => (preset === "core" ? core : governance).has(tool.name));
 }
 
 // ---------------------------------------------------------------------------
@@ -619,7 +631,8 @@ function handleToolCall(ctx: McpContext, id: number | string | null, params: unk
         toolName: name,
       });
       auditTool(ctx, id, name, startedAt, "success", secured.estimatedTokens, secured.truncated);
-      return toolResult(id, secured.text, false, secured.structuredContent);
+      if (ctx.tokenLogging) appendTokenLog(ctx.root, `mcp:${name}`, secured.emittedTokens);
+      return toolResult(id, secured.text, false, secured.structuredContent, ctx.protocolState !== undefined);
     } catch (e) {
       auditTool(ctx, id, name, startedAt, "blocked", 0, false);
       return toolResult(id, e instanceof Error ? e.message : String(e), true);
@@ -633,6 +646,14 @@ function handleToolCall(ctx: McpContext, id: number | string | null, params: unk
     auditTool(ctx, id, name, startedAt, "blocked", 0, false);
     return toolResult(id, "Tool error blocked by the secret-disclosure control.", true);
   }
+}
+
+function appendTokenLog(root: string, command: string, emittedTokens: number): void {
+  const directory = path.join(root, ".nodenet");
+  fs.mkdirSync(directory, { recursive: true });
+  fs.appendFileSync(path.join(directory, "token-log.jsonl"), JSON.stringify({
+    at: new Date().toISOString(), command, emittedTokens, pretty: false,
+  }) + "\n", { encoding: "utf8", mode: 0o600 });
 }
 
 function validateOutput(tool: McpTool, text: string): Result<void, string> {
@@ -684,14 +705,13 @@ function auditTool(
   });
 }
 
-function toolResult(id: number | string | null, text: string, isError: boolean, structuredContent?: Record<string, unknown>): string {
+function toolResult(id: number | string | null, text: string, isError: boolean, structuredContent?: Record<string, unknown>, structuredOnly = false): string {
   return JSON.stringify({
     jsonrpc: "2.0",
     id,
     result: {
-      content: [{
-        type: "text",
-        text,
+      content: structuredContent && !isError && structuredOnly ? [] : [{
+        type: "text", text,
         _meta: { trust: "untrusted_repository_evidence", executeAsInstructions: false },
       }],
       ...(structuredContent ? { structuredContent } : {}),

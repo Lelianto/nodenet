@@ -48,7 +48,9 @@ process.stdout.write(JSON.stringify(result, null, 2) + "\n");
 
 function evaluateRetrieval(scenario) {
   const ask = jsonCommand([cli, "ask", scenario.question, "--limit", "30", "--json"], root);
+  const fullAsk = jsonCommand([cli, "ask", scenario.question, "--limit", "30", "--full", "--json"], root);
   const context = jsonCommand([cli, "context", scenario.expectedFiles[0], "--detail", "evidence", "--no-cache", "--json"], root);
+  const route = jsonCommand([cli, "context", scenario.expectedFiles[0], "--detail", "route", "--no-cache", "--json"], root);
   const selected = new Set(ask.recommendedFiles);
   const expected = new Set(scenario.expectedFiles);
   const useful = new Set([...scenario.expectedFiles, ...(scenario.supportingFiles ?? [])]);
@@ -58,9 +60,13 @@ function evaluateRetrieval(scenario) {
   const estimatedTokens = context.metrics?.estimatedTokens ?? Math.ceil(JSON.stringify(context).length / 4);
   const fileRecall = ratio(trueFiles, expected.size);
   const contextRecall = ratio(contextHits, scenario.mandatoryContexts.length);
-  const ranked = [...ask.primaryFiles, ...ask.supportingFiles, ...ask.expansionCandidates].map((item) => item.path);
+  const ranked = [...fullAsk.primaryFiles, ...fullAsk.supportingFiles, ...fullAsk.expansionCandidates].map((item) => item.path);
   const filePrecision = ratio(trueFiles, selected.size);
-  return { id: scenario.id, split: scenario.split, expectedFiles: scenario.expectedFiles, supportingFiles: scenario.supportingFiles ?? [], selectedFiles: ask.recommendedFiles, filePrecision, usefulPrecision: ratio([...selected].filter((file) => useful.has(file)).length, selected.size), fileRecall, mandatoryContextRecall: contextRecall, reciprocalRank: reciprocalRank(ranked, expected), ndcg: ndcg(ranked, expected, new Set(scenario.supportingFiles ?? [])), estimatedTokens, pass: filePrecision >= 0.9 && fileRecall === 1 && contextRecall === 1 };
+  const routeContexts = new Set(route.livingContext.map((item) => item.id));
+  const routeContextRecall = ratio(scenario.mandatoryContexts.filter((id) => routeContexts.has(id)).length, scenario.mandatoryContexts.length);
+  const askRoutingPreserved = JSON.stringify(ask.recommendedFiles) === JSON.stringify(fullAsk.recommendedFiles);
+  const pass = filePrecision >= 0.9 && fileRecall === 1 && contextRecall === 1 && routeContextRecall === 1 && askRoutingPreserved;
+  return { id: scenario.id, split: scenario.split, expectedFiles: scenario.expectedFiles, supportingFiles: scenario.supportingFiles ?? [], selectedFiles: ask.recommendedFiles, filePrecision, usefulPrecision: ratio([...selected].filter((file) => useful.has(file)).length, selected.size), fileRecall, mandatoryContextRecall: contextRecall, routeMandatoryContextRecall: routeContextRecall, askRoutingPreserved, reciprocalRank: reciprocalRank(ranked, expected), ndcg: ndcg(ranked, expected, new Set(scenario.supportingFiles ?? [])), estimatedTokens, leanAskTokens: Math.ceil(Buffer.byteLength(JSON.stringify(ask)) / 4), fullAskTokens: Math.ceil(Buffer.byteLength(JSON.stringify(fullAsk)) / 4), routeTokens: route.metrics.emittedTokens, evidenceTokens: context.metrics.emittedTokens, pass };
 }
 
 function evaluateMutation(scenario) {

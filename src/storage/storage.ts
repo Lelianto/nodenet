@@ -154,7 +154,7 @@ function validateNode(raw: unknown): GraphNode | undefined {
     case "apiOperation":
     case "databaseTable":
     case "infrastructureResource":
-      return { ...base, kind, path: (n["path"] as string) ?? "", ...(typeof n["line"] === "number" ? { line: n["line"] } : {}), artifactType: (n["artifactType"] as "adr" | "openapi" | "sql" | "terraform" | "media") ?? "adr", ...(typeof n["candidate"] === "boolean" ? { candidate: n["candidate"] } : {}), ...(typeof n["mediaKind"] === "string" ? { mediaKind: n["mediaKind"] } : {}), ...(typeof n["summary"] === "string" ? { summary: n["summary"] } : {}) } as GraphNode;
+      return { ...base, kind, path: (n["path"] as string) ?? "", ...(typeof n["line"] === "number" ? { line: n["line"] } : {}), artifactType: (n["artifactType"] as "adr" | "markdown" | "openapi" | "sql" | "terraform" | "media") ?? "adr", ...(typeof n["candidate"] === "boolean" ? { candidate: n["candidate"] } : {}), ...(typeof n["mediaKind"] === "string" ? { mediaKind: n["mediaKind"] } : {}), ...(typeof n["summary"] === "string" ? { summary: n["summary"] } : {}) } as GraphNode;
     case "businessRule":
     case "architectureDecision":
     case "securityPolicy":

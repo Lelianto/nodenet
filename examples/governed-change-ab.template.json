@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1",
+  "experiment": "governed-change-ab",
+  "model": "record exact provider model and version",
+  "repositoryCommit": "full git sha",
+  "indexing": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "reuseCount": 1
+  },
+  "pairs": [
+    {
+      "taskId": "replace-with-frozen-task-id",
+      "control": {
+        "taskSuccess": true,
+        "regressionSuccess": true,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "elapsedMs": 0,
+        "toolCalls": 0,
+        "filesRead": 0,
+        "irrelevantFilesRead": 0,
+        "repairTurns": 0,
+        "mandatoryContextRecall": 0,
+        "reviewerPrecision": 0,
+        "reviewerRecall": 0,
+        "severityCorrect": false,
+        "forbiddenChanges": 0,
+        "governanceViolations": 0
+      },
+      "treatment": {
+        "taskSuccess": true,
+        "regressionSuccess": true,
+        "inputTokens": 0,
+        "cachedInputTokens": 0,
+        "outputTokens": 0,
+        "elapsedMs": 0,
+        "toolCalls": 0,
+        "filesRead": 0,
+        "irrelevantFilesRead": 0,
+        "repairTurns": 0,
+        "mandatoryContextRecall": 1,
+        "reviewerPrecision": 1,
+        "reviewerRecall": 1,
+        "severityCorrect": true,
+        "forbiddenChanges": 0,
+        "governanceViolations": 0
+      }
+    }
+  ]
+}

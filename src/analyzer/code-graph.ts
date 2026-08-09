@@ -91,7 +91,7 @@ export function buildCodeGraph(root: string, config: LoadedConfig, options: { in
   const graph = new Graph({
     maxNodes: config.limits.maxGraphNodes,
     maxEdges: config.limits.maxGraphEdges,
-  });
+  }, { root });
 
   const index: CodeGraphIndex = {
     fileNodes: new Map(),
@@ -291,9 +291,27 @@ export function buildCodeGraph(root: string, config: LoadedConfig, options: { in
   }
 
   attachRepositoryArtifacts(graph, scan.value.files);
+  attachDeclaredRelationships(graph, config, warnings);
 
   if (options.incrementalCache) saveParseCache(root, nextParseCache);
   return ok({ graph, index, warnings, incremental: { parsed: parsedCount, reused: reusedCount } });
+}
+
+function attachDeclaredRelationships(graph: Graph, config: LoadedConfig, warnings: string[]): void {
+  for (const declared of config.relationships) {
+    const from = graph.queryByName(declared.from).find((node) => node.name === declared.from) ?? graph.queryByName(declared.from)[0];
+    const to = graph.queryByName(declared.to).find((node) => node.name === declared.to) ?? graph.queryByName(declared.to)[0];
+    if (!from || !to) {
+      warnings.push(`Declared relationship could not resolve ${!from ? declared.from : declared.to}.`);
+      continue;
+    }
+    const result = addEdge(graph, from.id, to.id, declared.relation, {
+      source: "config",
+      location: "nodenet.config.json",
+      ...(declared.rationale ? { rationale: declared.rationale } : {}),
+    });
+    if (!result.ok) warnings.push(`Declared relationship ${declared.from} --${declared.relation}--> ${declared.to} is invalid: ${result.error.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------

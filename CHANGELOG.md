@@ -4,6 +4,38 @@ All notable changes to NodeNet are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.2] — 2026-08-09
+
+### Added
+
+- Governance-aware repository retrieval with lean `ask` output and progressive
+  `route`, `map`, `evidence`, and `source` context profiles.
+- Honest compact-wire accounting (`emittedTokens`, `mandatoryTokens`, budget
+  overflow reasons) plus private `.nodenet/token-log.jsonl` observations.
+- MCP `core`, `governance`, and `all` tool presets and structured-output
+  transport without duplicating the full payload as text.
+- Governed-change A/B protocol, scoring harness, and publishable-claim gates
+  that require task quality and governance correctness before token savings.
+- Deterministic artifact and configuration graph coverage, health/report
+  expansions, and scanner regressions for nested monorepo output directories.
+
+### Changed
+
+- Compact JSON is now the default; `--pretty` is opt-in.
+- `ask --json` returns routing fields by default; `--full` restores verbose
+  matches, connections, and ranking evidence.
+- Context payloads no longer duplicate `codeContext` or derivable
+  `selectionReason`; `--compat v1` provides a migration bridge.
+- Product positioning now leads with governed, explainable code change rather
+  than universal token-saving claims.
+
+### Fixed
+
+- Nested `node_modules`, `dist`, `build`, and equivalent plain-name ignore
+  directories are excluded at any monorepo depth.
+- Context budgeting now measures the final projected wire shape and explains
+  mandatory-governance overflow instead of silently exceeding a soft budget.
+
 ## [0.5.0] — 2026-08-09
 
 ### Changed

@@ -22,12 +22,20 @@ export function attachRepositoryArtifacts(graph: Graph, entries: ScanEntry[]): A
     if (!/\.(md|ya?ml|json|sql|tf)$/i.test(rel)) continue;
     let content: string;
     try { content = fs.readFileSync(entry.absPath, "utf8"); } catch { continue; }
-    if (/\.md$/i.test(rel) && /(^|\/)(adr|rfcs?|docs)(\/|$)/i.test(rel)) {
+    if (/\.md$/i.test(rel)) {
+      // Every Markdown file becomes a deterministic document node: ADR/RFC/docs
+      // directories keep the governance-oriented "adr" label, all other
+      // Markdown (README, guides, design notes, …) is tagged "markdown".
       const title = content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? path.basename(rel);
-      addArtifact(graph, { kind: "document", id: makeNodeId("artifact", "document", rel), name: title, path: entry.relPath, artifactType: "adr" });
+      addArtifact(graph, {
+        kind: "document", id: makeNodeId("artifact", "document", rel), name: title, path: entry.relPath,
+        artifactType: /(^|\/)(adr|rfcs?|docs)(\/|$)/i.test(rel) ? "adr" : "markdown",
+      });
       stats.documents++;
     }
-    if (/(openapi|swagger)/i.test(rel) || /["']?openapi["']?\s*[:=]/i.test(content)) {
+    // Markdown files are already ingested by the document branch above; an
+    // `openapi:` snippet inside a README/guide must not spawn a duplicate node.
+    if (!/\.md$/i.test(rel) && (/(openapi|swagger)/i.test(rel) || /["']?openapi["']?\s*[:=]/i.test(content))) {
       const parent = addArtifact(graph, { kind: "document", id: makeNodeId("artifact", "openapi", rel), name: path.basename(rel), path: entry.relPath, artifactType: "openapi" });
       const lines = content.split("\n");
       lines.forEach((line, index) => {

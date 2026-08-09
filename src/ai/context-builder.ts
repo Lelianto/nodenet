@@ -47,16 +47,13 @@ export interface BundleCodeEvidence {
   path?: string;
   relation: string;
   direction: "outgoing" | "incoming";
-  provenance: string;
-  score: number;
-  depth: 1 | 2;
-  selectionReason: string;
+  provenance?: string;
+  score?: number;
+  depth?: 1 | 2;
 }
 
 export interface ContextBundle {
   target: string;
-  codeContext: string[];
-  /** Structured, tainted repository evidence; codeContext remains for compatibility. */
   codeEvidence: BundleCodeEvidence[];
   sourceEvidence: BundleSourceEvidence[];
   recommendedFiles: string[];
@@ -71,9 +68,16 @@ export interface ContextBundle {
 }
 
 export interface ContextBundleMetrics {
-  /** Deterministic, model-neutral estimate (roughly four UTF-16 characters per token). */
+  /** Compact-payload estimate retained for compatibility. */
   estimatedTokens: number;
+  /** Estimate of the compact UTF-8 payload that leaves the process. */
+  emittedTokens: number;
+  /** Mandatory routing and governance payload before optional graph evidence. */
+  mandatoryTokens: number;
   budgetTokens: number;
+  budgetExceeded: boolean;
+  budgetExceededByMandatory: boolean;
+  budgetOverflowReason: "none" | "mandatory-governance" | "derived-routing";
   truncated: boolean;
   selectedNodes: number;
   omittedNodes: number;
@@ -83,7 +87,7 @@ export interface ContextBundleOptions {
   /** Soft output budget. Required governance is never discarded to satisfy it. */
   maxTokens?: number;
   /** Progressive output: map only, graph evidence, or bounded source snippets. */
-  detail?: "map" | "evidence" | "source";
+  detail?: "route" | "map" | "evidence" | "source";
   /** Required only for source detail; repository files are never read outside this root. */
   root?: string;
 }
@@ -94,7 +98,6 @@ export interface BundleSourceEvidence {
   endLine: number;
   text: string;
   provenance: "source";
-  selectionReason: string;
 }
 
 export const DEFAULT_CONTEXT_TOKEN_BUDGET = 2_000;
@@ -143,7 +146,6 @@ export function buildContextBundle(
 
   const bundle: ContextBundle = {
     target: nodeLabel(targetNode),
-    codeContext: [],
     codeEvidence: [],
     sourceEvidence: [],
     recommendedFiles: [],
@@ -161,38 +163,48 @@ export function buildContextBundle(
     secretFlagged: false,
     metrics: {
       estimatedTokens: 0,
+      emittedTokens: 0,
+      mandatoryTokens: 0,
       budgetTokens,
+      budgetExceeded: false,
+      budgetExceededByMandatory: false,
+      budgetOverflowReason: "none",
       truncated: false,
       selectedNodes: 0,
       omittedNodes: 0,
     },
   };
+  bundle.metrics.mandatoryTokens = estimateWireTokens(projectBundle(bundle, "route"));
   for (const candidate of related) {
-    if (detail === "map" && bundle.codeEvidence.length >= 12) break;
-    const next = [...bundle.codeContext, nodeLabel(candidate.node)];
     const evidence = evidenceFor(candidate);
-    const projected = { ...bundle, codeContext: next, codeEvidence: [...bundle.codeEvidence, evidence] };
-    if (estimateTokens(projected) > budgetTokens) continue;
-    bundle.codeContext = next;
+    const proposedEvidence = [...bundle.codeEvidence, evidence];
+    const proposedFiles = recommendedFiles(proposedEvidence);
+    const projected = { ...bundle, metrics: { ...bundle.metrics }, codeEvidence: proposedEvidence, recommendedFiles: proposedFiles };
+    const projectedOutput = projectBundle(projected, detail);
+    finalizeMetrics(projectedOutput);
+    if (projectedOutput.metrics.emittedTokens > budgetTokens && !projectedOutput.metrics.budgetExceededByMandatory) continue;
     bundle.codeEvidence.push(evidence);
   }
-  bundle.recommendedFiles = [...new Set(bundle.codeEvidence.map((entry) => entry.path).filter((value): value is string => Boolean(value)))].slice(0, 20);
+  bundle.recommendedFiles = recommendedFiles(bundle.codeEvidence);
   if (detail === "source" && options.root) {
     for (const candidate of [targetNode, ...related.map((item) => item.node)]) {
       if (bundle.sourceEvidence.length >= 8) break;
       const snippet = sourceSnippet(options.root, candidate, index);
       if (!snippet || bundle.sourceEvidence.some((item) => item.path === snippet.path && item.startLine === snippet.startLine)) continue;
-      const projected = { ...bundle, sourceEvidence: [...bundle.sourceEvidence, snippet] };
-      if (estimateTokens(projected) > budgetTokens) continue;
+      const projected = { ...bundle, metrics: { ...bundle.metrics }, sourceEvidence: [...bundle.sourceEvidence, snippet] };
+      const projectedOutput = projectBundle(projected, detail);
+      finalizeMetrics(projectedOutput);
+      if (projectedOutput.metrics.emittedTokens > budgetTokens && !projectedOutput.metrics.budgetExceededByMandatory) continue;
       bundle.sourceEvidence.push(snippet);
     }
   }
-  bundle.metrics.selectedNodes = bundle.codeContext.length;
-  bundle.metrics.omittedNodes = related.length - bundle.codeContext.length;
+  bundle.metrics.selectedNodes = bundle.codeEvidence.length;
+  bundle.metrics.omittedNodes = related.length - bundle.codeEvidence.length;
   bundle.metrics.truncated = bundle.metrics.omittedNodes > 0;
-  bundle.metrics.estimatedTokens = estimateTokens(bundle);
   bundle.secretFlagged = containsSecrets(JSON.stringify(bundle));
-  return bundle;
+  const output = projectBundle(bundle, detail);
+  finalizeMetrics(output);
+  return output;
 }
 
 function sourceSnippet(root: string, node: GraphNode, index: CodeGraphIndex): BundleSourceEvidence | null {
@@ -223,12 +235,44 @@ function sourceSnippet(root: string, node: GraphNode, index: CodeGraphIndex): Bu
     endLine,
     text,
     provenance: "source",
-    selectionReason: `${symbol ? "parser-bounded" : "line-bounded"} evidence around ${nodeLabel(node)}; secret-scanned and limited to ${endLine - startLine + 1} lines`,
   };
 }
 
 export function estimateTokens(value: unknown): number {
   return Math.ceil(JSON.stringify(value).length / 4);
+}
+
+export function estimateWireTokens(value: unknown, pretty = false): number {
+  return Math.ceil(Buffer.byteLength(JSON.stringify(value, null, pretty ? 2 : undefined)) / 4);
+}
+
+function projectBundle(bundle: ContextBundle, detail: NonNullable<ContextBundleOptions["detail"]>): ContextBundle {
+  const evidence = detail === "route" ? [] : bundle.codeEvidence.map((item) => detail === "map"
+    ? { id: item.id, label: item.label, ...(item.path ? { path: item.path } : {}), relation: item.relation, direction: item.direction }
+    : { ...item });
+  return {
+    ...bundle,
+    codeEvidence: evidence,
+    sourceEvidence: detail === "source" ? bundle.sourceEvidence : [],
+  };
+}
+
+function finalizeMetrics(bundle: ContextBundle): void {
+  // Stabilize the self-describing count; the digit width can change once set.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const emitted = estimateWireTokens(bundle);
+    bundle.metrics.estimatedTokens = emitted;
+    bundle.metrics.emittedTokens = emitted;
+  }
+  bundle.metrics.budgetExceeded = bundle.metrics.emittedTokens > bundle.metrics.budgetTokens;
+  bundle.metrics.budgetExceededByMandatory = bundle.metrics.mandatoryTokens > bundle.metrics.budgetTokens;
+  bundle.metrics.budgetOverflowReason = bundle.metrics.budgetExceededByMandatory
+    ? "mandatory-governance"
+    : bundle.metrics.budgetExceeded ? "derived-routing" : "none";
+}
+
+function recommendedFiles(evidence: BundleCodeEvidence[]): string[] {
+  return [...new Set(evidence.map((entry) => entry.path).filter((value): value is string => Boolean(value)))].slice(0, 20);
 }
 
 function normalizeTokenBudget(value: number | undefined): number {
@@ -386,7 +430,6 @@ function evidenceFor(candidate: RelatedCandidate): BundleCodeEvidence {
     provenance: candidate.provenance,
     score: candidate.score,
     depth: candidate.depth,
-    selectionReason: `${candidate.direction} ${candidate.relation} relation at depth ${candidate.depth}; provenance=${candidate.provenance}; deterministic score=${candidate.score}`,
   };
 }
 

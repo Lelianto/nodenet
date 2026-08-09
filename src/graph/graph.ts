@@ -149,12 +149,20 @@ export class Graph {
   /** Case-insensitive name search across nodes. */
   queryByName(name: string): GraphNode[] {
     const needle = name.toLowerCase();
-    const found: GraphNode[] = [];
+    const found: Array<{ node: GraphNode; score: number }> = [];
     for (const node of this.nodeMap.values()) {
-      if (node.name.toLowerCase().includes(needle)) found.push(node);
-      else if (node.kind === "file" && node.path.toLowerCase().includes(needle)) found.push(node);
+      const nodeName = node.name.toLowerCase();
+      const path = node.kind === "file" ? node.path.toLowerCase() : "";
+      let score = -1;
+      if (nodeName === needle) score = node.kind === "file" ? 300 : 500;
+      else if (nodeName.startsWith(needle)) score = node.kind === "file" ? 200 : 400;
+      else if (nodeName.includes(needle)) score = node.kind === "file" ? 150 : 350;
+      else if (path.includes(needle)) score = 100;
+      if (score >= 0) found.push({ node, score });
     }
-    return found;
+    return found
+      .sort((a, b) => b.score - a.score || a.node.name.localeCompare(b.node.name) || a.node.id.localeCompare(b.node.id))
+      .map(({ node }) => node);
   }
 
   // -- mutation API ----------------------------------------------------------

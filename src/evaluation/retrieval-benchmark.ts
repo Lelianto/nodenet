@@ -18,11 +18,18 @@ export interface RetrievalBenchmarkCase {
 }
 export interface RetrievalCaseResult {
   id: string; queryId: string; selectedFiles: string[]; filePrecision: number; fileRecall: number; usefulPrecision: number; reciprocalRank: number; ndcg: number;
-  mandatoryContextRecall: number; estimatedTokens: number; tokenReduction: number; truncated: boolean;
+  mandatoryContextRecall: number; estimatedTokens: number; emittedTokens: number; tokenReduction: number; emittedTokenReduction: number; truncated: boolean;
 }
 export interface RetrievalBenchmarkReport {
-  cases: number; medianTokenReduction: number; meanFilePrecision: number; meanFileRecall: number;
+  cases: number; medianTokenReduction: number; medianEmittedTokenReduction: number; meanFilePrecision: number; meanFileRecall: number;
   meanUsefulPrecision: number; meanReciprocalRank: number; meanNdcg: number; mandatoryContextRecall: number; results: RetrievalCaseResult[];
+}
+
+/**
+ * Tokens for the compact UTF-8 payload emitted by current CLI and MCP defaults.
+ */
+export function estimateEmittedTokens(value: unknown): number {
+  return Math.ceil(Buffer.byteLength(JSON.stringify(value)) / 4);
 }
 
 export function loadRetrievalBenchmark(file: string): RetrievalBenchmarkCase[] {
@@ -44,18 +51,21 @@ export function runRetrievalBenchmark(root: string, state: { graph: Graph; index
     const actualContexts = new Set(bundle?.livingContext.map((context) => context.id) ?? []);
     const trueContexts = item.mandatoryContexts.filter((id) => actualContexts.has(id)).length;
     const estimatedTokens = bundle ? estimateTokens(bundle) : estimateTokens(ask);
+    const emittedTokens = bundle ? estimateEmittedTokens(bundle) : estimateEmittedTokens(ask);
     return {
       id: item.id, queryId: ask.queryId, selectedFiles,
       filePrecision: ratio(trueFiles, selected.size), fileRecall: ratio(trueFiles, expected.size), usefulPrecision: ratio([...selected].filter((file) => useful.has(file)).length, selected.size),
       reciprocalRank: reciprocalRank([...ask.primaryFiles, ...ask.supportingFiles, ...ask.expansionCandidates].map((file) => file.path), expected),
       ndcg: ndcg([...ask.primaryFiles, ...ask.supportingFiles, ...ask.expansionCandidates].map((file) => file.path), expected, new Set(item.supportingFiles ?? [])),
-      mandatoryContextRecall: ratio(trueContexts, item.mandatoryContexts.length), estimatedTokens,
-      tokenReduction: Number((1 - estimatedTokens / item.rawBaselineTokens).toFixed(4)), truncated: bundle?.metrics.truncated ?? false,
+      mandatoryContextRecall: ratio(trueContexts, item.mandatoryContexts.length), estimatedTokens, emittedTokens,
+      tokenReduction: Number((1 - estimatedTokens / item.rawBaselineTokens).toFixed(4)),
+      emittedTokenReduction: Number((1 - emittedTokens / item.rawBaselineTokens).toFixed(4)), truncated: bundle?.metrics.truncated ?? false,
     };
   });
   return {
     cases: results.length,
     medianTokenReduction: percentile(results.map((item) => item.tokenReduction), 0.5),
+    medianEmittedTokenReduction: percentile(results.map((item) => item.emittedTokenReduction), 0.5),
     meanFilePrecision: mean(results.map((item) => item.filePrecision)),
     meanFileRecall: mean(results.map((item) => item.fileRecall)),
     meanUsefulPrecision: mean(results.map((item) => item.usefulPrecision)),

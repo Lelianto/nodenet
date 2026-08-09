@@ -25,6 +25,8 @@ export interface HealthReport {
     orphan: number;
   };
   ownershipCoverage: number;
+  /** Repository-relative file paths with no resolved owner. */
+  unownedFiles: string[];
   authorityCoverage: number;
   warnings: string[];
   metrics: {
@@ -105,7 +107,8 @@ export function computeHealth(
   }
 
   // ownership coverage: files with a declared owner / total files
-  const ownedFiles = filePaths.filter((p) => ownershipIndex.resolveOwner(p) !== null).length;
+  const unownedFiles = filePaths.filter((p) => ownershipIndex.resolveOwner(p) === null).map((p) => p.toString()).sort();
+  const ownedFiles = filePaths.length - unownedFiles.length;
   const ownershipCoverage = filePaths.length === 0 ? 0 : Math.round((ownedFiles / filePaths.length) * 1000) / 10;
   const codeWithoutOwner = filePaths.length - ownedFiles;
 
@@ -123,6 +126,7 @@ export function computeHealth(
       orphan,
     },
     ownershipCoverage,
+    unownedFiles,
     authorityCoverage,
     warnings,
     metrics: {

@@ -1,0 +1,16 @@
+# The package.json `files` allowlist is authoritative. These guards cover npm's
+# automatic README inclusion and common local artifacts.
+docs/README.md
+docs/private/
+docs/future-plan/
+benchmark-results/
+scripts/
+test/
+e2e/
+examples/
+.nodenet/
+.snowflake/
+coverage/
+*.tgz
+*.log
+*.jsonl

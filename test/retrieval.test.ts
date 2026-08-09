@@ -37,6 +37,21 @@ describe("token-efficient retrieval", () => {
     expect(bundle?.sourceEvidence.every((item) => item.endLine - item.startLine <= 10)).toBe(true);
   });
 
+  it("projects route and map payloads without legacy duplication", () => {
+    const { state } = fixture();
+    const route = buildContextBundle(state.graph, state.index, state.ownership, state.contexts, "createSettlement", { detail: "route" })!;
+    const map = buildContextBundle(state.graph, state.index, state.ownership, state.contexts, "createSettlement", { detail: "map" })!;
+    expect(route.codeEvidence).toEqual([]);
+    expect(route.recommendedFiles.length).toBeGreaterThan(0);
+    expect(map.codeEvidence.length).toBeGreaterThan(0);
+    expect(map.codeEvidence.every((item) => item.score === undefined && item.depth === undefined && item.provenance === undefined)).toBe(true);
+    expect("codeContext" in route).toBe(false);
+    expect(JSON.stringify(map)).not.toContain("selectionReason");
+    expect(route.metrics.emittedTokens).toBeGreaterThan(0);
+    expect(route.metrics.mandatoryTokens).toBeGreaterThan(0);
+    expect(["none", "mandatory-governance", "derived-routing"]).toContain(route.metrics.budgetOverflowReason);
+  });
+
   it("resolves an explicit file path before fuzzy symbol matches", () => {
     const { state } = fixture();
     const bundle = buildContextBundle(state.graph, state.index, state.ownership, state.contexts, "src/payment/PaymentService.ts", { detail: "evidence" });

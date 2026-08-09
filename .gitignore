@@ -3,6 +3,7 @@ dist/
 coverage/
 *.tsbuildinfo
 *.log
+*.tgz
 .DS_Store
 
 # Generated NodeNet data (committed .nodenet context/ownership files stay tracked)
@@ -13,6 +14,7 @@ coverage/
 **/.nodenet/parse-cache.json
 **/.nodenet/context-cache.json
 **/.nodenet/retrieval-feedback.jsonl
+**/.nodenet/token-log.jsonl
 **/.nodenet/audit.jsonl
 **/.nodenet/overrides.jsonl
 **/.nodenet/evaluation/
@@ -21,3 +23,5 @@ test/fixtures/**/dist/
 
 # Private planning documents (local only; never commit/publish)
 docs/private/
+docs/future-plan/
+.snowflake/

@@ -1,7 +1,7 @@
 {
   "name": "@antihero/nodenet",
-  "version": "0.6.0-beta.1",
-  "description": "NodeNet maps code, living context, ownership, and authority into an explainable graph — so humans and AI know what a change affects and who must review it. Deterministic, local-first, zero LLM/vector dependencies.",
+  "version": "0.6.0-beta.2",
+  "description": "Governance-aware repository intelligence for AI agents: route changes, explain impact, and resolve the right reviewers. Deterministic and local-first.",
   "keywords": [
     "graph",
     "code-graph",
@@ -63,6 +63,12 @@
   "files": [
     "dist",
     "README.md",
+    "ARCHITECTURE.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "docs/adr",
+    "docs/concepts",
+    "docs/security",
     "docs/languages.md",
     "docs/decision-quality.md",
     "docs/design-partner-playbook.md",
@@ -70,6 +76,11 @@
     "docs/evaluation.md",
     "docs/verified-overrides.md",
     "docs/mcp-operations.md",
+    "docs/product-positioning.md",
+    "docs/token-efficiency-v2.md",
+    "docs/experiments/nodenet-ab-medium-feature-verification-2026-08-09.md",
+    "docs/experiments/governed-change-ab-protocol.md",
+    "docs/logo.svg",
     "docs/language-support.svg",
     "docs/how-it-works.svg"
   ],
@@ -77,7 +88,8 @@
     "node": ">=20"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "beta"
   },
   "scripts": {
     "clean": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
@@ -88,6 +100,8 @@
     "benchmark:governance": "node scripts/benchmark-governance-fixture.mjs",
     "benchmark:languages": "node dist/cli/cli.js benchmark-languages --json",
     "test:e2e:self": "node scripts/e2e-self.mjs",
+    "experiment:token-tasks": "npm run build && node scripts/e2e-self.mjs",
+    "experiment:score-governed-ab": "node scripts/score-governed-change-ab.mjs",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

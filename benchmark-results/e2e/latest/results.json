@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "generatedAt": "2026-08-09T10:31:08.518Z",
+  "generatedAt": "2026-08-09T15:14:02.829Z",
   "repository": "NodeNet self-dogfood",
   "retrieval": [
     {
@@ -22,9 +22,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9908,
-      "estimatedTokens": 778,
+      "estimatedTokens": 595,
+      "leanAskTokens": 145,
+      "fullAskTokens": 4654,
+      "routeTokens": 243,
+      "evidenceTokens": 595,
       "pass": true
     },
     {
@@ -47,9 +53,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9696,
-      "estimatedTokens": 701,
+      "estimatedTokens": 549,
+      "leanAskTokens": 117,
+      "fullAskTokens": 4144,
+      "routeTokens": 257,
+      "evidenceTokens": 549,
       "pass": true
     },
     {
@@ -71,9 +83,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9651,
-      "estimatedTokens": 1147,
+      "estimatedTokens": 835,
+      "leanAskTokens": 151,
+      "fullAskTokens": 4961,
+      "routeTokens": 254,
+      "evidenceTokens": 835,
       "pass": true
     },
     {
@@ -94,9 +112,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.958,
-      "estimatedTokens": 2066,
+      "estimatedTokens": 1997,
+      "leanAskTokens": 133,
+      "fullAskTokens": 4373,
+      "routeTokens": 319,
+      "evidenceTokens": 1997,
       "pass": true
     },
     {
@@ -118,9 +142,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9884,
-      "estimatedTokens": 1208,
+      "estimatedTokens": 864,
+      "leanAskTokens": 134,
+      "fullAskTokens": 4389,
+      "routeTokens": 244,
+      "evidenceTokens": 864,
       "pass": true
     },
     {
@@ -142,9 +172,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9769,
-      "estimatedTokens": 2063,
+      "estimatedTokens": 1967,
+      "leanAskTokens": 120,
+      "fullAskTokens": 5506,
+      "routeTokens": 384,
+      "evidenceTokens": 1967,
       "pass": true
     },
     {
@@ -166,9 +202,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9595,
-      "estimatedTokens": 2031,
+      "estimatedTokens": 1992,
+      "leanAskTokens": 134,
+      "fullAskTokens": 4620,
+      "routeTokens": 321,
+      "evidenceTokens": 1992,
       "pass": true
     },
     {
@@ -188,9 +230,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9085,
-      "estimatedTokens": 2073,
+      "estimatedTokens": 1974,
+      "leanAskTokens": 112,
+      "fullAskTokens": 3281,
+      "routeTokens": 380,
+      "evidenceTokens": 1974,
       "pass": true
     },
     {
@@ -210,9 +258,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9773,
-      "estimatedTokens": 2027,
+      "estimatedTokens": 1989,
+      "leanAskTokens": 115,
+      "fullAskTokens": 4520,
+      "routeTokens": 396,
+      "evidenceTokens": 1989,
       "pass": true
     },
     {
@@ -234,9 +288,15 @@
       "usefulPrecision": 1,
       "fileRecall": 1,
       "mandatoryContextRecall": 1,
+      "routeMandatoryContextRecall": 1,
+      "askRoutingPreserved": true,
       "reciprocalRank": 1,
       "ndcg": 0.9246,
-      "estimatedTokens": 926,
+      "estimatedTokens": 668,
+      "leanAskTokens": 153,
+      "fullAskTokens": 5084,
+      "routeTokens": 186,
+      "evidenceTokens": 668,
       "pass": true
     }
   ],
@@ -277,7 +337,7 @@
       "id": "parser-change",
       "changedFileDetected": true,
       "severity": "HIGH",
-      "affectedFiles": 107,
+      "affectedFiles": 109,
       "blastContexts": [
         "NN-GOV-001",
         "NN-LANG-001",
@@ -304,7 +364,7 @@
       "id": "mcp-security-change",
       "changedFileDetected": true,
       "severity": "CRITICAL",
-      "affectedFiles": 108,
+      "affectedFiles": 110,
       "blastContexts": [
         "NN-GOV-001",
         "NN-LANG-001",
@@ -331,7 +391,7 @@
       "id": "governance-change",
       "changedFileDetected": true,
       "severity": "HIGH",
-      "affectedFiles": 108,
+      "affectedFiles": 110,
       "blastContexts": [
         "NN-GOV-001",
         "NN-LANG-001",
@@ -366,14 +426,14 @@
   "abPilot": {
     "variantA": {
       "policy": "broad authored-corpus read",
-      "estimatedTokens": 274129
+      "estimatedTokens": 315355
     },
     "variantB": {
       "policy": "ask + bounded context",
       "successfulTasks": 10,
       "tasks": 10,
-      "estimatedTokens": 15020,
-      "tokenReduction": 0.9945
+      "estimatedTokens": 13430,
+      "tokenReduction": 0.9957
     }
   }
 }

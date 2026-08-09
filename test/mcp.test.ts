@@ -64,7 +64,7 @@ describe("MCP server protocol", () => {
 
   it("retrieves natural-language matches and hypothetical affected nodes", () => {
     const ask = call(ctx, 31, "ask", { question: "what connects checkout to payment" });
-    expect(JSON.parse(toolText(ask!)).matches.length).toBeGreaterThan(0);
+    expect(JSON.parse(toolText(ask!)).recommendedFiles.length).toBeGreaterThan(0);
     const affected = call(ctx, 32, "affected", { target: "PaymentService", depth: 2 });
     expect(JSON.parse(toolText(affected!)).affected.length).toBeGreaterThan(0);
   });
@@ -176,6 +176,21 @@ describe("MCP server protocol", () => {
     const wrongRepository: McpContext = { ...graphOnly, authorization: { scopes: new Set(["graph:read"]), repositoryRoot: path.join(root, "other") } };
     expect(call(wrongRepository, 924, "graph")?.error?.code).toBe(-32001);
   });
+
+  it("applies tool presets and avoids duplicating structured transport payloads", () => {
+    const transportCtx: McpContext = {
+      ...ctx,
+      toolPreset: "core",
+      protocolState: { initialized: true, ready: true, shutdownRequested: false },
+    };
+    const listed = send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 925, method: "tools/list" }));
+    const names = (listed?.result?.tools as { name: string }[]).map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(["ask", "context", "query"]));
+    expect(names).not.toContain("report");
+    const result = call(transportCtx, 926, "ask", { question: "payment settlement" });
+    expect(result?.result?.content).toEqual([]);
+    expect(result?.result?.structuredContent).toMatchObject({ tool: "ask", data: { recommendedFiles: expect.any(Array) } });
+  });
 });
 
 describe("MCP snapshot and audit integrity", () => {
@@ -253,7 +268,7 @@ describe("MCP tools", () => {
       target: string;
       livingContext: { id: string }[];
       aiGuidance: { action: string }[];
-      codeEvidence: { id: string; relation: string; direction: string; provenance: string; score: number; depth: number; selectionReason: string }[];
+      codeEvidence: { id: string; relation: string; direction: string; provenance: string; score: number; depth: number }[];
       recommendedFiles: string[];
       secretFlagged: boolean;
       metrics: { estimatedTokens: number; budgetTokens: number; truncated: boolean };
@@ -261,7 +276,7 @@ describe("MCP tools", () => {
     expect(bundle.livingContext.map((c) => c.id)).toEqual(expect.arrayContaining(["PAYMENT-003", "SEC-009"]));
     expect(bundle.aiGuidance.length).toBeGreaterThan(0);
     expect(bundle.codeEvidence.length).toBeGreaterThan(0);
-    expect(bundle.codeEvidence.every((entry) => entry.id && entry.relation && entry.direction && entry.provenance && entry.selectionReason && Number.isFinite(entry.score))).toBe(true);
+    expect(bundle.codeEvidence.every((entry) => entry.id && entry.relation && entry.direction && entry.provenance && Number.isFinite(entry.score))).toBe(true);
     expect(bundle.codeEvidence.some((entry) => entry.depth === 2)).toBe(true);
     expect(bundle.recommendedFiles.length).toBeGreaterThan(0);
     expect(typeof bundle.secretFlagged).toBe("boolean");

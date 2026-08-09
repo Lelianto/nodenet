@@ -138,6 +138,14 @@ Initial release gates:
 Claims about token savings must include end-to-end task tokens and quality, not
 only a comparison between raw corpus size and serialized graph size.
 
+> **Gate accounting caveat.** These gates are written against
+> `metrics.estimatedTokens`, which serializes compactly while the CLI and MCP
+> emit indent-2 JSON — a measured **+25%** undercount of the real payload. Until
+> the estimator is corrected, evaluate gates against `emittedTokens` (now
+> reported by `benchmark-retrieval`). See
+> [`future-plan/token-efficiency-strategy-v2.md`](future-plan/token-efficiency-strategy-v2.md) § 3
+> and [`experiments/nodenet-token-levers-2026-08-09.md`](experiments/nodenet-token-levers-2026-08-09.md).
+
 ## Delivery roadmap
 
 1. **Measurement:** token estimates, bundle metrics, task dataset, evaluator.

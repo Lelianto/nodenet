@@ -48,6 +48,30 @@ describe("local artifact ingestion", () => {
     expect([...build.value.graph.edges()].some((edge) => edge.relation === "defines")).toBe(true);
   });
 
+  it("ingests every markdown file as a document node, ADRs included", () => {
+    const root = tmpDir(); roots.push(root);
+    fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });
+    fs.mkdirSync(path.join(root, "guides"), { recursive: true });
+    fs.writeFileSync(path.join(root, "package.json"), '{"name":"markdown-docs"}');
+    fs.writeFileSync(path.join(root, "README.md"), "# Acme Payments\n\nDescription.\n");
+    fs.writeFileSync(path.join(root, "guides", "deploy.md"), "# Deployment guide\n\nHow to deploy.\n");
+    fs.writeFileSync(path.join(root, "docs", "adr", "002.md"), "# Use event sourcing\n");
+    fs.writeFileSync(path.join(root, "notes.txt"), "not markdown\n");
+    const config = loadConfig(root); if (!config.ok) throw config.error;
+    const build = buildCodeGraph(root, config.value); if (!build.ok) throw build.error;
+    const documents = [...build.value.graph.nodes()].filter((node) => node.kind === "document");
+    expect(documents).toHaveLength(3);
+    const byType = (type: string) => documents.filter((node) => "artifactType" in node && node.artifactType === type).map((node) => node.name);
+    expect(byType("markdown").sort()).toEqual(["Acme Payments", "Deployment guide"]);
+    expect(byType("adr")).toEqual(["Use event sourcing"]);
+    expect(documents.filter((node) => node.candidate === true)).toHaveLength(0);
+    const saved = saveGraph(root, build.value.graph); if (!saved.ok) throw saved.error;
+    const loaded = loadGraph(root); if (!loaded.ok) throw loaded.error;
+    const loadedDocs = [...(loaded.value?.nodes() ?? [])].filter((node) => node.kind === "document");
+    expect(loadedDocs).toHaveLength(3);
+    expect(loadedDocs.some((node) => "artifactType" in node && node.artifactType === "markdown" && node.name === "Deployment guide")).toBe(true);
+  });
+
   it("exposes a replaceable language adapter registry", () => {
     expect(registeredLanguageAdapters()).toHaveLength(9);
     const matrix = languageSupportMatrix();

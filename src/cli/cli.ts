@@ -35,8 +35,8 @@ import { findPath, neighbors } from "../graph/traversal.js";
 import { analyzeImpact, type ImpactReport } from "../change/impact.js";
 import { resolveReviewers, type ReviewResolution } from "../review/resolver.js";
 import { computeHealth, type HealthReport } from "../health/health.js";
-import { buildContextBundle, type ContextBundle } from "../ai/context-builder.js";
-import { askGraph, affectedByTarget } from "../ai/retrieval.js";
+import { buildContextBundle, estimateWireTokens, type ContextBundle } from "../ai/context-builder.js";
+import { askGraph, affectedByTarget, leanAskResult } from "../ai/retrieval.js";
 import { appendRetrievalFeedback, RETRIEVAL_OUTCOMES, type RetrievalOutcome } from "../ai/feedback.js";
 import { contextCacheKey, readContextCache, writeContextCache } from "../ai/context-cache.js";
 import { renderGraphHtml } from "../visualization/html.js";
@@ -289,10 +289,31 @@ function reconstructIndex(graph: Graph): CodeGraphIndex {
 // Output helpers
 // ---------------------------------------------------------------------------
 
+let prettyJsonOutput = false;
+
 function printJson(value: unknown, json: boolean): void {
   if (json) {
-    process.stdout.write(JSON.stringify(value, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(value, null, prettyJsonOutput ? 2 : undefined) + "\n");
   }
+}
+
+function appendTokenLog(root: string, command: string, payload: unknown): void {
+  const directory = path.join(root, ".nodenet");
+  fs.mkdirSync(directory, { recursive: true });
+  fs.appendFileSync(path.join(directory, "token-log.jsonl"), JSON.stringify({
+    at: new Date().toISOString(), command, emittedTokens: estimateWireTokens(payload, prettyJsonOutput), pretty: prettyJsonOutput,
+  }) + "\n", { encoding: "utf8", mode: 0o600 });
+}
+
+function legacyContextPayload(bundle: ContextBundle): Record<string, unknown> {
+  return {
+    ...bundle,
+    codeContext: bundle.codeEvidence.map((entry) => entry.label),
+    codeEvidence: bundle.codeEvidence.map((entry) => ({
+      ...entry,
+      selectionReason: `${entry.direction} ${entry.relation} relation at depth ${entry.depth ?? "unknown"}; provenance=${entry.provenance ?? "unknown"}; deterministic score=${entry.score ?? "unknown"}`,
+    })),
+  };
 }
 
 function humanNode(node: GraphNode): string {
@@ -313,6 +334,20 @@ function nodeToRecord(node: GraphNode): Record<string, unknown> {
   return record;
 }
 
+/** Rank exact symbols above fuzzy symbols and filename-only matches, then
+ * expand an exact class hit with methods declared in the same source file.
+ * Pattern adapters do not always retain class scope, so file locality is the
+ * most reliable cross-language fallback. */
+function queryMatches(graph: Graph, name: string): GraphNode[] {
+  const initial = graph.queryByName(name);
+  const exactClass = initial.find((node) => node.kind === "class" && node.name.toLowerCase() === name.toLowerCase());
+  if (!exactClass || !("path" in exactClass)) return initial;
+  const path = exactClass.path;
+  const expanded = graph.findNodes((node) => node.kind === "method" && "path" in node && node.path === path);
+  const seen = new Set(initial.map((node) => node.id));
+  return [...initial, ...expanded.filter((node) => !seen.has(node.id))];
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -326,7 +361,10 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     .description("NodeNet maps code, context, ownership, and authority into an explainable graph.")
     .version(NODENET_VERSION);
 
-  const withJson = (cmd: Command): Command => cmd.option("--json", "machine-readable JSON output");
+  const withJson = (cmd: Command): Command => cmd
+    .option("--json", "machine-readable JSON output")
+    .option("--pretty", "pretty-print JSON (compact is the default)")
+    .hook("preAction", (_thisCommand, actionCommand) => { prettyJsonOutput = Boolean(actionCommand.opts()["pretty"]); });
 
   // -- init -------------------------------------------------------------------
   program
@@ -450,7 +488,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .description("Search the graph for nodes by name")
       .action((name: string, cmdOptions: { json?: boolean }) => {
         const { graph } = loadForAnalysis(cwd, loadConfigChecked(cwd));
-        const matches = graph.queryByName(name).slice(0, 200);
+        const matches = queryMatches(graph, name).slice(0, 200);
         if (cmdOptions.json) {
           printJson(matches.map(nodeToRecord), true);
           return;
@@ -466,12 +504,17 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .command("ask <question>")
       .description("Retrieve an intent-aware, token-efficient subgraph for a natural-language question")
       .option("--limit <number>", "maximum ranked matches", "30")
-      .action((question: string, cmdOptions: { json?: boolean; limit?: string }) => {
+      .option("--full", "include verbose matches, connections, and ranking explanations")
+      .action((question: string, cmdOptions: { json?: boolean; limit?: string; full?: boolean }) => {
         const { graph } = loadForAnalysis(cwd, loadConfigChecked(cwd));
         const limit = Number(cmdOptions.limit ?? "30");
         if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("--limit must be an integer from 1 to 100.");
         const result = askGraph(graph, question, limit);
-        if (cmdOptions.json) return printJson(result, true);
+        if (cmdOptions.json) {
+          const payload = cmdOptions.full ? result : leanAskResult(result);
+          appendTokenLog(cwd, "ask", payload);
+          return printJson(payload, true);
+        }
         process.stdout.write(`query id: ${result.queryId}\nintent: ${result.intent}\n`);
         for (const match of result.matches) process.stdout.write(`${match.score.toString().padStart(3)} ${match.name}${match.path ? ` @ ${match.path}` : ""}\n`);
         if (!result.matches.length) process.stdout.write("No matches. Refine the question with a symbol or file name.\n");
@@ -579,9 +622,10 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .option("--migrate", "preview migration of legacy contexts to the LCDD 0.6 Registry")
       .option("--write", "write migration output (requires --migrate)")
       .option("--max-tokens <number>", "advanced: override the automatic AI context budget")
-      .option("--detail <level>", "progressive detail: map, evidence, or source", "evidence")
+      .option("--detail <level>", "progressive detail: route, map, evidence, or source", "evidence")
+      .option("--compat <version>", "legacy wire compatibility (v1)")
       .option("--no-cache", "do not read or write the local context cache")
-      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean; maxTokens?: string; detail?: string; cache?: boolean }) => {
+      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean; maxTokens?: string; detail?: string; cache?: boolean; compat?: string }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config);
         if (cmdOptions.write && !cmdOptions.migrate) {
@@ -650,10 +694,11 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           throw new Error("--max-tokens must be a positive number.");
         }
         const detail = cmdOptions.detail ?? "evidence";
-        if (!["map", "evidence", "source"].includes(detail)) throw new Error("--detail must be map, evidence, or source.");
+        if (!["route", "map", "evidence", "source"].includes(detail)) throw new Error("--detail must be route, map, evidence, or source.");
+        if (cmdOptions.compat !== undefined && cmdOptions.compat !== "v1") throw new Error("--compat currently supports only v1.");
         const bundleOptions = {
           ...(requestedBudget !== undefined ? { maxTokens: requestedBudget } : {}),
-          detail: detail as "map" | "evidence" | "source",
+          detail: detail as "route" | "map" | "evidence" | "source",
           ...(detail === "source" ? { root: cwd } : {}),
         };
         const key = contextCacheKey({ graphBuiltAt: state.graph.metadata.builtAt, target, options: bundleOptions, contextFingerprint: JSON.stringify(state.contexts) });
@@ -664,7 +709,9 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         }
         if (cmdOptions.cache !== false) writeContextCache(cwd, key, bundle);
         if (cmdOptions.json) {
-          printJson(bundle, true);
+          const payload = cmdOptions.compat === "v1" ? legacyContextPayload(bundle) : bundle;
+          appendTokenLog(cwd, `context:${detail}`, payload);
+          printJson(payload, true);
           return;
         }
         printBundle(bundle);
@@ -724,7 +771,8 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     program
       .command("owner <path-or-symbol>")
       .description("Show who owns a file or symbol")
-      .action((target: string, cmdOptions: { json?: boolean }) => {
+      .option("--explain", "show every matching ownership rule and the selected rule")
+      .action((target: string, cmdOptions: { json?: boolean; explain?: boolean }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config);
         const filePath = resolveTargetPath(state.graph, state.index, target);
@@ -737,13 +785,23 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           process.stdout.write(`No declared owner for ${filePath.toString()}.\n`);
           return;
         }
+        const matching = state.ownership.matching(filePath).map((record) => ({
+          ...record,
+          selected: record.owner === resolution.owner && record.source === resolution.source && record.confidence === resolution.confidence,
+        }));
         if (cmdOptions.json) {
-          printJson({ file: filePath.toString(), ...resolution }, true);
+          printJson({ file: filePath.toString(), ...resolution, ...(cmdOptions.explain ? { matching } : {}) }, true);
           return;
         }
         process.stdout.write(
           `${filePath.toString()} → ${resolution.owner} (source: ${resolution.source}, confidence: ${resolution.confidence})\n`,
         );
+        if (cmdOptions.explain) {
+          process.stdout.write("Resolution chain (source priority, then confidence):\n");
+          for (const record of matching) {
+            process.stdout.write(`  ${record.selected ? "SELECTED" : "matched "} ${record.pattern} → ${record.owner} (${record.source}, ${record.confidence})\n`);
+          }
+        }
       }),
   );
 
@@ -857,7 +915,8 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     program
       .command("health")
       .description("Report living context health (spec §25)")
-      .action((cmdOptions: { json?: boolean }) => {
+      .option("--uncovered", "list files without a resolved owner")
+      .action((cmdOptions: { json?: boolean; uncovered?: boolean }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config);
         const report = computeHealth(state.graph, state.contexts, state.ownership, config);
@@ -865,7 +924,60 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           printJson(report, true);
           return;
         }
-        printHealth(report);
+        printHealth(report, cmdOptions.uncovered ?? false);
+      }),
+  );
+
+  // -- snapshot / diff -------------------------------------------------------
+  withJson(
+    program
+      .command("snapshot")
+      .description("Write a deterministic graph snapshot for CI drift checks")
+      .option("-o, --output <file>", "snapshot path", ".nodenet/snapshot.json")
+      .action((cmdOptions: { json?: boolean; output?: string }) => {
+        const state = loadForAnalysis(cwd, loadConfigChecked(cwd));
+        const output = path.resolve(cwd, cmdOptions.output ?? ".nodenet/snapshot.json");
+        fs.mkdirSync(path.dirname(output), { recursive: true });
+        const snapshot = state.graph.toSnapshot();
+        const stable = {
+          schemaVersion: 1,
+          nodenetVersion: NODENET_VERSION,
+          nodes: [...snapshot.nodes].sort((a, b) => a.id.localeCompare(b.id)),
+          edges: [...snapshot.edges].sort((a, b) => a.id.localeCompare(b.id)),
+        };
+        fs.writeFileSync(output, JSON.stringify(stable, null, 2) + "\n");
+        const result = { output, nodes: stable.nodes.length, edges: stable.edges.length };
+        if (cmdOptions.json) return printJson(result, true);
+        process.stdout.write(`Snapshot written to ${output} (${result.nodes} nodes, ${result.edges} edges)\n`);
+      }),
+  );
+
+  withJson(
+    program
+      .command("diff-snapshot <file>")
+      .description("Compare the current graph with a saved NodeNet snapshot")
+      .action((file: string, cmdOptions: { json?: boolean }) => {
+        const state = loadForAnalysis(cwd, loadConfigChecked(cwd));
+        const saved = JSON.parse(fs.readFileSync(path.resolve(cwd, file), "utf8")) as { nodes?: Array<{ id: string }>; edges?: Array<{ id: string }> };
+        if (!Array.isArray(saved.nodes) || !Array.isArray(saved.edges)) throw new Error("Invalid NodeNet snapshot: nodes[] and edges[] are required.");
+        const current = state.graph.toSnapshot();
+        const delta = (before: string[], after: string[]) => {
+          const beforeSet = new Set(before);
+          const afterSet = new Set(after);
+          return {
+            added: after.filter((id) => !beforeSet.has(id)).sort(),
+            removed: before.filter((id) => !afterSet.has(id)).sort(),
+          };
+        };
+        const nodes = delta(saved.nodes.map((node) => node.id), current.nodes.map((node) => node.id));
+        const edges = delta(saved.edges.map((edge) => edge.id), current.edges.map((edge) => edge.id));
+        const changed = nodes.added.length + nodes.removed.length + edges.added.length + edges.removed.length > 0;
+        const result = { changed, nodes, edges };
+        if (changed) commandExitCode = 2;
+        if (cmdOptions.json) return printJson(result, true);
+        process.stdout.write(changed
+          ? `Graph drift detected: nodes +${nodes.added.length}/-${nodes.removed.length}, edges +${edges.added.length}/-${edges.removed.length}\n`
+          : "No graph drift detected.\n");
       }),
   );
 
@@ -986,12 +1098,18 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     .command("doctor")
     .description("Validate configuration, graph, governance readiness and health")
     .option("--json", "emit machine-readable readiness JSON")
-    .action((cmdOptions: { json?: boolean }) => {
+    .option("--fix", "safely install missing starter files and the GitHub governance workflow")
+    .action((cmdOptions: { json?: boolean; fix?: boolean }) => {
+      const fixes = cmdOptions.fix ? bootstrapRepository(cwd, true) : undefined;
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config);
       const report = computeHealth(state.graph, state.contexts, state.ownership, config);
       const readiness = assessReadiness(cwd, state);
-      if (cmdOptions.json) return printJson({ readiness, health: report, warnings: state.warnings }, true);
+      if (cmdOptions.json) return printJson({ readiness, health: report, warnings: state.warnings, ...(fixes ? { fixes } : {}) }, true);
+      if (fixes) {
+        for (const file of fixes.created) process.stdout.write(`fixed: ${file}\n`);
+        for (const file of fixes.skipped) process.stdout.write(`already present: ${file}\n`);
+      }
       process.stdout.write(`config: ok (${state.warnings.length === 0 ? "no warnings" : state.warnings.length + " warnings"})\n`);
       process.stdout.write(`graph: ${state.graph.size} nodes, ${state.graph.edgeCount} edges\n`);
       process.stdout.write(`readiness: ${readiness.score}/100 (${readiness.ready ? "ready" : "needs attention"})\n`);
@@ -1263,10 +1381,13 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   program
     .command("mcp")
     .description("Run the MCP server over stdio (Model Context Protocol)")
-    .action(async () => {
+    .option("--tools <preset>", "tool preset: core, governance, or all", "core")
+    .action(async (cmdOptions: { tools?: string }) => {
+      const toolPreset = cmdOptions.tools ?? "core";
+      if (!["core", "governance", "all"].includes(toolPreset)) throw new Error("--tools must be core, governance, or all.");
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config) as AnalysisState;
-      const ctx = prepareMcpContext({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true });
+      const ctx = prepareMcpContext({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true, toolPreset: toolPreset as "core" | "governance" | "all" });
       const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
       for await (const line of rl) {
         const response = handleMcpLine(ctx, line);
@@ -1300,12 +1421,15 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     .option("--rate-refill <count>", "tokens replenished per second", "10")
     .option("--reload-interval <ms>", "stale-state check interval for atomic reload", "2000")
     .option("--no-reload", "disable automatic atomic snapshot reload")
-    .action(async (cmdOptions: { host?: string; port?: string; token?: string; scopes?: string; rateCapacity?: string; rateRefill?: string; reloadInterval?: string; reload?: boolean }) => {
+    .option("--tools <preset>", "tool preset: core, governance, or all", "core")
+    .action(async (cmdOptions: { host?: string; port?: string; token?: string; scopes?: string; rateCapacity?: string; rateRefill?: string; reloadInterval?: string; reload?: boolean; tools?: string }) => {
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config) as AnalysisState;
       const port = Number(cmdOptions.port ?? "7341");
       if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Port must be an integer from 0 to 65535.");
       const host = cmdOptions.host ?? "127.0.0.1";
+      const toolPreset = cmdOptions.tools ?? "core";
+      if (!["core", "governance", "all"].includes(toolPreset)) throw new Error("--tools must be core, governance, or all.");
       if (host !== "127.0.0.1" && host !== "::1" && !cmdOptions.token) {
         throw new Error("A bearer token is required when binding beyond loopback.");
       }
@@ -1320,7 +1444,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       if (!Number.isInteger(rateCapacity) || rateCapacity < 1) throw new Error("--rate-capacity must be a positive integer.");
       if (!Number.isFinite(rateRefillPerSecond) || rateRefillPerSecond <= 0) throw new Error("--rate-refill must be positive.");
       if (cmdOptions.reload !== false && (!Number.isInteger(reloadIntervalMs) || reloadIntervalMs < 250)) throw new Error("--reload-interval must be an integer of at least 250ms.");
-      const server = await startMcpHttpServer({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true }, {
+      const server = await startMcpHttpServer({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true, toolPreset: toolPreset as "core" | "governance" | "all" }, {
         host,
         port,
         ...(cmdOptions.token ? { credentials: [{ token: cmdOptions.token, scopes, repositoryRoot: cwd }] } : {}),
@@ -1489,9 +1613,9 @@ function printReview(review: ReviewResolution, impact: ImpactReport): void {
 function printBundle(bundle: ContextBundle): void {
   process.stdout.write(`TARGET\n  ${bundle.target}\n`);
   process.stdout.write(`  context budget: ~${bundle.metrics.estimatedTokens}/${bundle.metrics.budgetTokens} tokens${bundle.metrics.truncated ? " (truncated)" : ""}\n`);
-  if (bundle.codeContext.length > 0) {
+  if (bundle.codeEvidence.length > 0) {
     process.stdout.write(`\nCODE CONTEXT\n`);
-    for (const c of bundle.codeContext) process.stdout.write(`  ${c}\n`);
+    for (const evidence of bundle.codeEvidence) process.stdout.write(`  ${evidence.label}\n`);
   }
   if (bundle.sourceEvidence.length > 0) {
     process.stdout.write(`\nSOURCE EVIDENCE\n`);
@@ -1526,7 +1650,7 @@ function printBundle(bundle: ContextBundle): void {
   }
 }
 
-function printHealth(report: HealthReport): void {
+function printHealth(report: HealthReport, showUncovered = false): void {
   process.stdout.write(`## NodeNet Context Health\n`);
   process.stdout.write(`Timestamp: ${report.timestamp}\n`);
   process.stdout.write(`Context artifacts: ${report.contexts.total}\n`);
@@ -1537,6 +1661,10 @@ function printHealth(report: HealthReport): void {
   if (report.contexts.orphan > 0) process.stdout.write(`  orphan: ${report.contexts.orphan}\n`);
   process.stdout.write(`Ownership coverage: ${report.ownershipCoverage}%\n`);
   process.stdout.write(`Authority coverage: ${report.authorityCoverage}%\n`);
+  if (showUncovered) {
+    process.stdout.write(`Uncovered files (${report.unownedFiles.length}):\n`);
+    for (const file of report.unownedFiles) process.stdout.write(`  ${file}\n`);
+  }
   if (report.warnings.length > 0) {
     process.stdout.write(`\nWarnings:\n`);
     for (const w of report.warnings) process.stdout.write(`  - ${w}\n`);

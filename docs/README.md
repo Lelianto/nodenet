@@ -24,6 +24,8 @@ This directory is the hub for all NodeNet documentation. Start with the
 | 15 | Verified identity, RBAC, and signed overrides | [verified-overrides.md](verified-overrides.md) |
 | 16 | Token-efficient graph context and delivery plan | [token-efficient-context.md](token-efficient-context.md) |
 | 17 | Operating MCP scopes, limits, reload, workers, and audit | [mcp-operations.md](mcp-operations.md) |
+| 18 | Product positioning and evidence boundaries | [product-positioning.md](product-positioning.md) |
+| 19 | Token-efficient defaults and compatibility | [token-efficiency-v2.md](token-efficiency-v2.md) |
 
 ## Concepts
 
@@ -55,6 +57,20 @@ Core mental model documents.
   actors, local RBAC policy, and signed override verification.
 - [token-efficient-context.md](token-efficient-context.md) — Graphify comparison,
   budgeted MSC design, evaluation gates, and delivery roadmap.
+- [product-positioning.md](product-positioning.md) — NodeNet's category,
+  supported promise, permitted claims, and competitive frame.
+- [token-efficiency-v2.md](token-efficiency-v2.md) — implemented lean defaults,
+  context profiles, wire accounting, MCP reductions, and compatibility.
+- [future-plan/token-efficiency-strategy-v2.md](future-plan/token-efficiency-strategy-v2.md) —
+  historical planning rationale behind the implemented token-efficiency work;
+  payload-level break-even observations are not a universal task-token claim.
+- [experiments/nodenet-token-levers-2026-08-09.md](experiments/nodenet-token-levers-2026-08-09.md) —
+  the measurements behind v2: 12 targets, 8 corpora, and the break-even curve.
+- [experiments/nodenet-ab-medium-feature-verification-2026-08-09.md](experiments/nodenet-ab-medium-feature-verification-2026-08-09.md) —
+  latest medium-repository feature verification, real-tokenizer audit, and
+  exploratory live A/B.
+- [experiments/governed-change-ab-protocol.md](experiments/governed-change-ab-protocol.md) —
+  paired-task design and blocking gates for future public efficiency claims.
 - [mcp-operations.md](mcp-operations.md) — safe MCP deployment, scopes, rate
   limiting, atomic reload, worker cancellation, schemas, and audit verification.
 

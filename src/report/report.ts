@@ -23,6 +23,9 @@ import type { LoadedConfig } from "../config/config.js";
 import { computeHealth, type HealthReport } from "../health/health.js";
 import { detectCommunities, type CommunityId } from "../visualization/communities.js";
 import { matchGlob } from "../utils/glob.js";
+import { NODENET_VERSION } from "../version.js";
+import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 // ---------------------------------------------------------------------------
 // Report shapes
@@ -77,6 +80,13 @@ export interface ReportSuggestedQuestion {
 
 export interface GraphReport {
   timestamp: string;
+  provenance: {
+    nodenetVersion: string;
+    nodeVersion: string;
+    configHash: string;
+    repositoryCommit?: string;
+    repositoryDirty?: boolean;
+  };
   summary: {
     nodes: number;
     edges: number;
@@ -370,8 +380,15 @@ export function buildReport(
     else if (isSymbolKind(node.kind)) codeSymbols++;
   }
 
+  const git = repositoryProvenance(graph.metadata.root);
   return {
     timestamp: now.toISOString(),
+    provenance: {
+      nodenetVersion: NODENET_VERSION,
+      nodeVersion: process.version,
+      configHash: crypto.createHash("sha256").update(JSON.stringify(config)).digest("hex"),
+      ...git,
+    },
     summary: {
       nodes: graph.size,
       edges: graph.edgeCount,
@@ -387,6 +404,16 @@ export function buildReport(
   };
 }
 
+function repositoryProvenance(root: string): { repositoryCommit?: string; repositoryDirty?: boolean } {
+  const commit = spawnSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8", timeout: 3_000 });
+  if (commit.status !== 0) return {};
+  const status = spawnSync("git", ["-C", root, "status", "--porcelain"], { encoding: "utf8", timeout: 3_000 });
+  return {
+    repositoryCommit: commit.stdout.trim(),
+    ...(status.status === 0 ? { repositoryDirty: status.stdout.trim().length > 0 } : {}),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Markdown rendering
 // ---------------------------------------------------------------------------
@@ -395,6 +422,10 @@ export function renderReportMarkdown(report: GraphReport): string {
   const lines: string[] = [];
   lines.push(`# NodeNet Report`);
   lines.push(`\n_Generated ${report.timestamp} — deterministic, derived from the persisted graph._`);
+  lines.push(`\n- **NodeNet:** ${report.provenance.nodenetVersion}`);
+  lines.push(`- **Node.js:** ${report.provenance.nodeVersion}`);
+  lines.push(`- **Config SHA-256:** ${report.provenance.configHash}`);
+  if (report.provenance.repositoryCommit) lines.push(`- **Repository:** ${report.provenance.repositoryCommit}${report.provenance.repositoryDirty ? " (dirty)" : " (clean)"}`);
   lines.push(`\n## Summary`);
   lines.push(
     `- **Nodes:** ${report.summary.nodes} (${report.summary.files} files, ${report.summary.codeSymbols} symbols)`,

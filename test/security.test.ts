@@ -67,6 +67,35 @@ describe("scanner security", () => {
     expect(scan.value.warnings.some((w) => w.includes("outside repository"))).toBe(true);
   });
 
+  it("skips nested node_modules (monorepo layouts) at any depth", () => {
+    const root = tmpDir();
+    fs.mkdirSync(path.join(root, "src"), { recursive: true });
+    fs.mkdirSync(path.join(root, "website", "node_modules", "vite"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src", "app.ts"), "export const a = 1;\n");
+    fs.writeFileSync(path.join(root, "website", "node_modules", "vite", "index.js"), "module.exports = {};\n");
+    const scan = scanRepository(root, defaultConfig());
+    expect(scan.ok).toBe(true);
+    if (!scan.ok) return;
+    const rels = scan.value.files.map((f) => f.relPath.toString());
+    expect(rels).toContain("src/app.ts");
+    expect(rels.some((r) => r.includes("node_modules"))).toBe(false);
+    expect(rels.some((r) => r.includes("website"))).toBe(false);
+  });
+
+  it("skips plain ignore names (dist/build) at any depth in monorepos", () => {
+    const root = tmpDir();
+    fs.mkdirSync(path.join(root, "implementation", "packages", "core", "dist"), { recursive: true });
+    fs.mkdirSync(path.join(root, "implementation", "packages", "core", "src"), { recursive: true });
+    fs.writeFileSync(path.join(root, "implementation", "packages", "core", "dist", "index.d.ts"), "export declare const x: number;\n");
+    fs.writeFileSync(path.join(root, "implementation", "packages", "core", "src", "index.ts"), "export const x = 1;\n");
+    const scan = scanRepository(root, defaultConfig());
+    expect(scan.ok).toBe(true);
+    if (!scan.ok) return;
+    const rels = scan.value.files.map((f) => f.relPath.toString());
+    expect(rels).toContain("implementation/packages/core/src/index.ts");
+    expect(rels.some((r) => r.includes("/dist/"))).toBe(false);
+  });
+
   it("skips oversized files with a warning instead of crashing", () => {
     const root = tmpDir();
     fs.mkdirSync(path.join(root, "src"), { recursive: true });

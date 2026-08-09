@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMITS } from "../src/security/limits.js";
 import { safeRelativePath } from "../src/security/filesystem.js";
 import { languageAdapterFor, languageSupportMatrix } from "../src/parser/registry.js";
+import { defaultConfig } from "../src/config/config.js";
+import { buildCodeGraph } from "../src/analyzer/code-graph.js";
+import fs from "node:fs";
+import path from "node:path";
+import { tmpDir } from "./helpers.js";
 
 const cases = [
   { language: "typescript", file: "service.ts", source: "import { x } from './dep';\nexport class TypeScriptService {}", symbol: "TypeScriptService" },
@@ -32,5 +37,18 @@ describe("declared language support contract", () => {
     expect(matrix.filter((item) => item.tier === "full")).toHaveLength(7);
     expect(matrix.filter((item) => item.tier === "basic")).toHaveLength(3);
     expect(new Set(matrix.map((item) => item.language)).size).toBe(10);
+  });
+
+  it("adds explicit cross-language relationships with config provenance", () => {
+    const root = tmpDir();
+    fs.mkdirSync(path.join(root, "src"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src", "checkout.ts"), "export function checkout() {}\n");
+    fs.writeFileSync(path.join(root, "src", "payment.py"), "def settle():\n    pass\n");
+    const config = defaultConfig();
+    config.relationships = [{ from: "checkout", to: "settle", relation: "calls", rationale: "HTTP payment request" }];
+    const built = buildCodeGraph(root, config);
+    if (!built.ok) throw built.error;
+    const edge = [...built.value.graph.edges()].find((candidate) => candidate.relation === "calls");
+    expect(edge?.provenance).toMatchObject({ source: "config", rationale: "HTTP payment request" });
   });
 });
