@@ -1,0 +1,28 @@
+[
+  {
+    "id": "payment-settlement-context",
+    "question": "what connects checkout to payment settlement",
+    "expectedFiles": [
+      "src/payment/PaymentService.ts",
+      "src/payment/SettlementRepository.ts"
+    ],
+    "supportingFiles": [
+      "src/checkout/CheckoutService.ts",
+      "src/payment/SettlementSchema.ts"
+    ],
+    "mandatoryContexts": ["PAYMENT-003", "SEC-009"],
+    "rawBaselineTokens": 4000,
+    "maxTokens": 2000
+  },
+  {
+    "id": "media-payment-architecture",
+    "question": "where is the payment approval architecture and settlement repository diagram",
+    "expectedFiles": [
+      "docs/payment-architecture.svg"
+    ],
+    "supportingFiles": ["src/payment/SettlementRepository.ts"],
+    "mandatoryContexts": [],
+    "rawBaselineTokens": 4000,
+    "maxTokens": 1200
+  }
+]

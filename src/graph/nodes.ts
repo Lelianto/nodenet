@@ -197,7 +197,11 @@ export interface ArtifactNode extends NodeBase {
   kind: "document" | "apiOperation" | "databaseTable" | "infrastructureResource";
   path: SafeRelativePath;
   line?: number;
-  artifactType: "adr" | "openapi" | "sql" | "terraform";
+  artifactType: "adr" | "openapi" | "sql" | "terraform" | "media";
+  /** Media nodes are retrieval candidates only; they never carry authority. */
+  candidate?: boolean;
+  mediaKind?: "image" | "document" | "video" | "audio";
+  summary?: string;
 }
 
 // ---------------------------------------------------------------------------

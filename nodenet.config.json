@@ -1,0 +1,19 @@
+{
+  "developer": { "team": "core-team" },
+  "ownership": {
+    "teams": {
+      "core-team": { "name": "NodeNet Core" },
+      "language-team": { "name": "Language Intelligence" },
+      "security-team": { "name": "Security and MCP" },
+      "governance-team": { "name": "Governance Quality" }
+    },
+    "overrides": [
+      { "pattern": "src/parser/**", "owner": "language-team", "source": "nodenet", "confidence": "AUTHORITATIVE" },
+      { "pattern": "src/mcp/**", "owner": "security-team", "source": "nodenet", "confidence": "AUTHORITATIVE" },
+      { "pattern": "src/security/**", "owner": "security-team", "source": "nodenet", "confidence": "AUTHORITATIVE" },
+      { "pattern": "src/governance/**", "owner": "governance-team", "source": "nodenet", "confidence": "AUTHORITATIVE" },
+      { "pattern": "src/evaluation/**", "owner": "governance-team", "source": "nodenet", "confidence": "AUTHORITATIVE" },
+      { "pattern": "src/**", "owner": "core-team", "source": "nodenet", "confidence": "DECLARED" }
+    ]
+  }
+}

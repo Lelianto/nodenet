@@ -11,6 +11,12 @@ The primary product metric is successful tasks per total agent token. Token
 savings alone are not a success if task quality falls or a mandatory living
 context is missed.
 
+Code and supported repository documents are extracted locally. Media remains at
+a deliberately safer boundary: files become non-authoritative candidates, and
+a bounded adjacent `.nodenet.json` sidecar can supply `summary` and `concepts`
+from an approved local or model-assisted pipeline. These concepts are inferred
+retrieval evidence and cannot govern or block a change.
+
 ## What Graphify validates
 
 Graphify demonstrates several useful patterns: query-first agent guidance,
@@ -24,7 +30,7 @@ large graph result, then the same raw files can use more tokens than direct
 source inspection. NodeNet therefore budgets the returned MSC itself and keeps
 governance evidence mandatory.
 
-## Current quick wins
+## Implemented retrieval path
 
 The first implementation adds an automatic path: users run
 `nodenet context <target>` or call MCP `context` with only `target`. NodeNet
@@ -43,6 +49,15 @@ It also adds:
   evaluation, unusually large targets, and constrained clients.
 - A governance guarantee: living context, authority, ownership, boundaries, and
   guidance are retained even if required data exceeds the soft budget.
+- Intent-aware `nodenet ask` retrieval and hypothetical `nodenet affected` analysis.
+- File-level ranking with compact `primaryFiles`, deferred `supportingFiles`,
+  and on-demand `expansionCandidates`.
+- Progressive `--detail map|evidence|source` output with bounded,
+  secret-scanned snippets.
+- A bounded cache that never stores snippets or secret-flagged bundles.
+- Local opt-in feedback that never mutates authority.
+- An executable graded-relevance benchmark for primary/useful precision,
+  essential/context recall, MRR, nDCG@10, and token reduction.
 
 ## Target architecture
 

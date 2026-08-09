@@ -63,7 +63,8 @@ export function buildPrComment(impact: ImpactReport, review: ReviewResolution, o
   appendGroup(lines, "Required", review.required);
   appendGroup(lines, "Authority approval required", review.authorityRequired);
   appendGroup(lines, "Suggested", review.suggested);
-  if (review.required.length + review.authorityRequired.length + review.suggested.length === 0) {
+  appendGroup(lines, "Informational (transitive only)", review.informational);
+  if (review.required.length + review.authorityRequired.length + review.suggested.length + review.informational.length === 0) {
     lines.push("- No reviewers required.");
   }
   lines.push("");
@@ -93,7 +94,7 @@ function appendGroup(lines: string[], title: string, items: ReviewResolution["re
 /** Whether the analyzed change requires hardened/mandatory authority approval. */
 export function isBlockingReview(impact: ImpactReport, review: ReviewResolution): boolean {
   if (review.authorityRequired.length === 0) return false;
-  return impact.affectedContexts.some(
+  return impact.directContexts.some(
     (ctx) => isActiveContext(ctx) && ctx.approvalRequired &&
       effectiveEnforcementMode(ctx) === "block" &&
       (isBlockingAuthority(ctx.authority) || authorityRank(ctx.authority) >= 4),

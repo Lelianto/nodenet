@@ -14,9 +14,9 @@ const BODY = `${START}
 
 Before broad source search or a material code change:
 
-1. Run \`nodenet context "<task or target>"\` to retrieve minimum sufficient context.
+1. Run \`nodenet ask "<task or question>"\`, then \`nodenet context "<selected target>" --detail source\` to retrieve minimum sufficient context.
 2. Check \`nodenet governed-by <target>\` and \`nodenet owner <target>\`.
-3. After editing, run \`nodenet impact\` and \`nodenet reviewers\`.
+3. Before editing, use \`nodenet affected <target>\` for hypothetical blast radius. After editing, run \`nodenet impact\` and \`nodenet reviewers\`.
 4. Treat DECLARED governance evidence as authoritative; distinguish EXTRACTED, INFERRED, and AMBIGUOUS evidence.
 5. Do not bypass a blocking governance decision. Explain the evidence path when proposing an exception.
 ${END}`;

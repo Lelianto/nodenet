@@ -1,0 +1,7 @@
+{
+  "summary": "Architecture diagram connecting checkout, payment approval, and settlement persistence.",
+  "concepts": [
+    "Payment approval architecture",
+    "Settlement repository diagram"
+  ]
+}

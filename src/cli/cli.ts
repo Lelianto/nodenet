@@ -36,6 +36,9 @@ import { analyzeImpact, type ImpactReport } from "../change/impact.js";
 import { resolveReviewers, type ReviewResolution } from "../review/resolver.js";
 import { computeHealth, type HealthReport } from "../health/health.js";
 import { buildContextBundle, type ContextBundle } from "../ai/context-builder.js";
+import { askGraph, affectedByTarget } from "../ai/retrieval.js";
+import { appendRetrievalFeedback, RETRIEVAL_OUTCOMES, type RetrievalOutcome } from "../ai/feedback.js";
+import { contextCacheKey, readContextCache, writeContextCache } from "../ai/context-cache.js";
 import { renderGraphHtml } from "../visualization/html.js";
 import type { GovernanceMapOptions } from "../visualization/governance-map.js";
 import { renderGraphSvg } from "../visualization/svg.js";
@@ -61,6 +64,9 @@ import { startGraphDevServer } from "../visualization/dev-server.js";
 import { assessReadiness } from "../onboarding/readiness.js";
 import { bootstrapRepository } from "../onboarding/bootstrap.js";
 import { loadBenchmarkCases, scoreBenchmark } from "../evaluation/benchmark.js";
+import { runLanguageBenchmark } from "../evaluation/language-benchmark.js";
+import { loadRetrievalBenchmark, runRetrievalBenchmark } from "../evaluation/retrieval-benchmark.js";
+import { loadExecutableGovernanceCases, runGovernanceBenchmark } from "../evaluation/governance-benchmark.js";
 import type { DecisionOverride } from "../governance/audit.js";
 import { resolveGitHubIdentity } from "../identity/identity.js";
 import { importGitHubHistory } from "../evaluation/github-import.js";
@@ -454,6 +460,45 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       }),
   );
 
+  // -- ask --------------------------------------------------------------------
+  withJson(
+    program
+      .command("ask <question>")
+      .description("Retrieve an intent-aware, token-efficient subgraph for a natural-language question")
+      .option("--limit <number>", "maximum ranked matches", "30")
+      .action((question: string, cmdOptions: { json?: boolean; limit?: string }) => {
+        const { graph } = loadForAnalysis(cwd, loadConfigChecked(cwd));
+        const limit = Number(cmdOptions.limit ?? "30");
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("--limit must be an integer from 1 to 100.");
+        const result = askGraph(graph, question, limit);
+        if (cmdOptions.json) return printJson(result, true);
+        process.stdout.write(`query id: ${result.queryId}\nintent: ${result.intent}\n`);
+        for (const match of result.matches) process.stdout.write(`${match.score.toString().padStart(3)} ${match.name}${match.path ? ` @ ${match.path}` : ""}\n`);
+        if (!result.matches.length) process.stdout.write("No matches. Refine the question with a symbol or file name.\n");
+        if (result.suggestedNext.length) process.stdout.write(`next:\n${result.suggestedNext.map((item) => `  ${item}`).join("\n")}\n`);
+      }),
+  );
+
+  // -- affected ---------------------------------------------------------------
+  withJson(
+    program
+      .command("affected <target>")
+      .description("Explore the hypothetical graph blast radius of a symbol or file")
+      .option("--depth <number>", "maximum graph depth", "2")
+      .action((target: string, cmdOptions: { json?: boolean; depth?: string }) => {
+        const config = loadConfigChecked(cwd);
+        const { graph } = loadForAnalysis(cwd, config);
+        const depth = Number(cmdOptions.depth ?? "2");
+        if (!Number.isInteger(depth) || depth < 1 || depth > config.limits.maxTraversalDepth) throw new Error(`--depth must be an integer from 1 to ${config.limits.maxTraversalDepth}.`);
+        const result = affectedByTarget(graph, config, target, depth);
+        if (!result) { process.stdout.write(`No target matched "${target}".\n`); return; }
+        if (cmdOptions.json) return printJson(result, true);
+        process.stdout.write(`${result.target.name}\n`);
+        for (const item of result.affected) process.stdout.write(`  -> ${item.name}${item.path ? ` @ ${item.path}` : ""}\n`);
+        if (result.truncated) process.stdout.write("Result truncated by traversal limits.\n");
+      }),
+  );
+
   // -- related ----------------------------------------------------------------
   withJson(
     program
@@ -534,7 +579,9 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .option("--migrate", "preview migration of legacy contexts to the LCDD 0.6 Registry")
       .option("--write", "write migration output (requires --migrate)")
       .option("--max-tokens <number>", "advanced: override the automatic AI context budget")
-      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean; maxTokens?: string }) => {
+      .option("--detail <level>", "progressive detail: map, evidence, or source", "evidence")
+      .option("--no-cache", "do not read or write the local context cache")
+      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean; maxTokens?: string; detail?: string; cache?: boolean }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config);
         if (cmdOptions.write && !cmdOptions.migrate) {
@@ -602,13 +649,20 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         if (requestedBudget !== undefined && (!Number.isFinite(requestedBudget) || requestedBudget <= 0)) {
           throw new Error("--max-tokens must be a positive number.");
         }
-        const bundle = buildContextBundle(state.graph, state.index, state.ownership, state.contexts, target, {
+        const detail = cmdOptions.detail ?? "evidence";
+        if (!["map", "evidence", "source"].includes(detail)) throw new Error("--detail must be map, evidence, or source.");
+        const bundleOptions = {
           ...(requestedBudget !== undefined ? { maxTokens: requestedBudget } : {}),
-        });
+          detail: detail as "map" | "evidence" | "source",
+          ...(detail === "source" ? { root: cwd } : {}),
+        };
+        const key = contextCacheKey({ graphBuiltAt: state.graph.metadata.builtAt, target, options: bundleOptions, contextFingerprint: JSON.stringify(state.contexts) });
+        const bundle = cmdOptions.cache !== false ? readContextCache(cwd, key) ?? buildContextBundle(state.graph, state.index, state.ownership, state.contexts, target, bundleOptions) : buildContextBundle(state.graph, state.index, state.ownership, state.contexts, target, bundleOptions);
         if (!bundle) {
           process.stdout.write(`No target matched "${target}". Try a symbol or file name.\n`);
           return;
         }
+        if (cmdOptions.cache !== false) writeContextCache(cwd, key, bundle);
         if (cmdOptions.json) {
           printJson(bundle, true);
           return;
@@ -616,6 +670,18 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         printBundle(bundle);
       }),
   );
+
+  program
+    .command("feedback")
+    .description("Record local opt-in retrieval feedback without changing graph authority")
+    .requiredOption("--query-id <id>", "query id emitted by nodenet ask")
+    .requiredOption("--outcome <outcome>", `outcome: ${RETRIEVAL_OUTCOMES.join(", ")}`)
+    .option("--note <text>", "optional short note")
+    .action((cmdOptions: { queryId: string; outcome: string; note?: string }) => {
+      if (!RETRIEVAL_OUTCOMES.includes(cmdOptions.outcome as RetrievalOutcome)) throw new Error(`--outcome must be ${RETRIEVAL_OUTCOMES.join(", ")}.`);
+      const record = appendRetrievalFeedback(cwd, { queryId: cmdOptions.queryId, outcome: cmdOptions.outcome as RetrievalOutcome, ...(cmdOptions.note ? { note: cmdOptions.note.slice(0, 500) } : {}) });
+      process.stdout.write(`Feedback recorded for ${record.queryId}: ${record.outcome}\n`);
+    });
 
   // -- explain ----------------------------------------------------------------
   withJson(
@@ -968,6 +1034,51 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       process.stdout.write(`latency p50/p95: ${metrics.p50Ms}ms / ${metrics.p95Ms}ms\n`);
     });
 
+  program
+    .command("benchmark-languages")
+    .description("Run the executable parser contract benchmark across all ten built-in languages")
+    .option("--json", "emit machine-readable benchmark results")
+    .action((cmdOptions: { json?: boolean }) => {
+      const report = runLanguageBenchmark();
+      if (report.passed !== report.cases) commandExitCode = 2;
+      if (cmdOptions.json) return printJson(report, true);
+      process.stdout.write(`language cases: ${report.passed}/${report.cases} passed (${(report.passRate * 100).toFixed(1)}%)\n`);
+      for (const row of report.languages) {
+        process.stdout.write(`${row.language.padEnd(12)} ${row.passed}/${row.cases} precision=${row.symbolPrecision} recall=${row.symbolRecall} importRecall=${row.importRecall}\n`);
+        for (const failure of row.failures) process.stdout.write(`  - ${failure}\n`);
+      }
+    });
+
+  program
+    .command("benchmark-retrieval")
+    .description("Run labeled retrieval tasks against the current graph and MSC engine")
+    .requiredOption("--dataset <file>", "retrieval task JSON dataset")
+    .option("--json", "emit machine-readable benchmark results")
+    .action((cmdOptions: { dataset: string; json?: boolean }) => {
+      const config = loadConfigChecked(cwd);
+      const state = loadForAnalysis(cwd, config);
+      const report = runRetrievalBenchmark(cwd, state, loadRetrievalBenchmark(path.resolve(cwd, cmdOptions.dataset)));
+      if (cmdOptions.json) return printJson(report, true);
+      process.stdout.write(`retrieval cases: ${report.cases}\nmedian token reduction: ${(report.medianTokenReduction * 100).toFixed(1)}%\nprimary precision/essential recall: ${(report.meanFilePrecision * 100).toFixed(1)}% / ${(report.meanFileRecall * 100).toFixed(1)}%\nuseful precision: ${(report.meanUsefulPrecision * 100).toFixed(1)}% · MRR: ${report.meanReciprocalRank} · nDCG@10: ${report.meanNdcg}\nmandatory context recall: ${(report.mandatoryContextRecall * 100).toFixed(1)}%\n`);
+      for (const result of report.results) process.stdout.write(`${result.id}: reduction=${(result.tokenReduction * 100).toFixed(1)}% fileRecall=${(result.fileRecall * 100).toFixed(1)}% contextRecall=${(result.mandatoryContextRecall * 100).toFixed(1)}%\n`);
+      if (report.mandatoryContextRecall < 1) commandExitCode = 2;
+    });
+
+  program
+    .command("benchmark-governance")
+    .description("Execute impact, reviewer, and decision engines against labeled git-base scenarios")
+    .requiredOption("--dataset <file>", "JSON cases containing base refs and expected decisions")
+    .option("--json", "emit machine-readable benchmark results")
+    .action((cmdOptions: { dataset: string; json?: boolean }) => {
+      const config = loadConfigChecked(cwd);
+      const state = loadForAnalysis(cwd, config) as AnalysisState;
+      const report = runGovernanceBenchmark(cwd, config, state, loadExecutableGovernanceCases(path.resolve(cwd, cmdOptions.dataset)));
+      if (cmdOptions.json) return printJson(report, true);
+      process.stdout.write(`governance cases: ${report.metrics.cases}; errors: ${report.errors.length}\nprecision=${report.metrics.reviewerPrecision} recall=${report.metrics.reviewerRecall} falseBlocks=${report.metrics.falseBlockRate} missedImpact=${report.metrics.missedImpactRate} accuracy=${report.metrics.outcomeAccuracy} p95=${report.metrics.p95Ms}ms\n`);
+      for (const error of report.errors) process.stdout.write(`  ERROR ${error.id}: ${error.error}\n`);
+      if (report.errors.length || report.metrics.outcomeAccuracy < 1 || report.metrics.missedImpactRate > 0) commandExitCode = 2;
+    });
+
   // -- eval -------------------------------------------------------------------
   const evaluation = program.command("eval").description("Import, replay, label and evaluate historical pull requests");
   evaluation
@@ -1180,7 +1291,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   // -- serve ------------------------------------------------------------------
   program
     .command("serve")
-    .description("EXPERIMENTAL: serve the MCP JSON-RPC bridge over local HTTP (not Streamable HTTP)")
+    .description("Serve standards-compliant MCP Streamable HTTP with scoped, loopback-first access")
     .option("--host <host>", "bind host; loopback is the safe default", "127.0.0.1")
     .option("--port <port>", "bind port", "7341")
     .option("--token <token>", "optional bearer token")
@@ -1224,7 +1335,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           },
         } : {}),
       });
-      process.stdout.write(`EXPERIMENTAL NodeNet MCP JSON-RPC bridge listening at ${server.url}/mcp (not MCP Streamable HTTP)\n`);
+      process.stdout.write(`NodeNet MCP Streamable HTTP listening at ${server.url}/mcp\n`);
       await new Promise<void>((resolve) => {
         const stop = () => void server.close().then(resolve);
         process.once("SIGINT", stop);
@@ -1316,7 +1427,10 @@ function printImpact(impact: ImpactReport, json: boolean): void {
         changedFiles: impact.changedFiles.map((f) => f.toString()),
         changedSymbols: impact.changedSymbols,
         affectedFiles: impact.affectedFiles.map((f) => f.toString()),
+        approvalFiles: impact.approvalFiles.map((f) => f.toString()),
         affectedContexts: impact.affectedContexts.map((c) => c.id),
+        directContexts: impact.directContexts.map((c) => c.id),
+        transitiveContexts: impact.transitiveContexts.map((c) => c.id),
         boundaries: impact.boundaries,
         owners: impact.owners,
       },
@@ -1366,7 +1480,8 @@ function printReview(review: ReviewResolution, impact: ImpactReport): void {
   printGroup("Suggested", review.suggested);
   printGroup("Required", review.required);
   printGroup("Authority approval required", review.authorityRequired);
-  if (review.suggested.length + review.required.length + review.authorityRequired.length === 0) {
+  printGroup("Informational (transitive only)", review.informational);
+  if (review.suggested.length + review.required.length + review.authorityRequired.length + review.informational.length === 0) {
     process.stdout.write("No reviewers required.\n");
   }
 }
@@ -1377,6 +1492,13 @@ function printBundle(bundle: ContextBundle): void {
   if (bundle.codeContext.length > 0) {
     process.stdout.write(`\nCODE CONTEXT\n`);
     for (const c of bundle.codeContext) process.stdout.write(`  ${c}\n`);
+  }
+  if (bundle.sourceEvidence.length > 0) {
+    process.stdout.write(`\nSOURCE EVIDENCE\n`);
+    for (const evidence of bundle.sourceEvidence) {
+      process.stdout.write(`  ${evidence.path}:${evidence.startLine}-${evidence.endLine}\n`);
+      process.stdout.write(evidence.text.split("\n").map((line) => `    ${line}`).join("\n") + "\n");
+    }
   }
   if (bundle.livingContext.length > 0) {
     process.stdout.write(`\nLIVING CONTEXT\n`);

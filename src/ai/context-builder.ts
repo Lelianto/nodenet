@@ -18,6 +18,8 @@ import { authorityRank, isBlockingAuthority } from "../authority/authority.js";
 import type { OwnershipIndex } from "../ownership/resolver.js";
 import { matchGlob } from "../utils/glob.js";
 import { containsSecrets } from "../security/secrets.js";
+import fs from "node:fs";
+import path from "node:path";
 
 export interface BundleContextRef {
   id: string;
@@ -56,6 +58,7 @@ export interface ContextBundle {
   codeContext: string[];
   /** Structured, tainted repository evidence; codeContext remains for compatibility. */
   codeEvidence: BundleCodeEvidence[];
+  sourceEvidence: BundleSourceEvidence[];
   recommendedFiles: string[];
   livingContext: BundleContextRef[];
   ownership: BundleOwner[];
@@ -79,6 +82,19 @@ export interface ContextBundleMetrics {
 export interface ContextBundleOptions {
   /** Soft output budget. Required governance is never discarded to satisfy it. */
   maxTokens?: number;
+  /** Progressive output: map only, graph evidence, or bounded source snippets. */
+  detail?: "map" | "evidence" | "source";
+  /** Required only for source detail; repository files are never read outside this root. */
+  root?: string;
+}
+
+export interface BundleSourceEvidence {
+  path: string;
+  startLine: number;
+  endLine: number;
+  text: string;
+  provenance: "source";
+  selectionReason: string;
 }
 
 export const DEFAULT_CONTEXT_TOKEN_BUDGET = 2_000;
@@ -94,7 +110,6 @@ export function buildContextBundle(
   query: string,
   options: ContextBundleOptions = {},
 ): ContextBundle | null {
-  void index;
   const target = findTarget(graph, query);
   if (!target) return null;
 
@@ -102,6 +117,7 @@ export function buildContextBundle(
   const targetFile = targetFileOf(targetNode);
   const related = findRelated(graph, targetNode);
   const budgetTokens = normalizeTokenBudget(options.maxTokens);
+  const detail = options.detail ?? "evidence";
 
   const livingContext = contexts.filter((ctx) =>
     targetFile !== undefined && ctx.appliesTo.some((pattern) => matchGlob(pattern, targetFile.toString())),
@@ -129,6 +145,7 @@ export function buildContextBundle(
     target: nodeLabel(targetNode),
     codeContext: [],
     codeEvidence: [],
+    sourceEvidence: [],
     recommendedFiles: [],
     livingContext: livingContext.map((c) => ({
       id: c.id,
@@ -151,6 +168,7 @@ export function buildContextBundle(
     },
   };
   for (const candidate of related) {
+    if (detail === "map" && bundle.codeEvidence.length >= 12) break;
     const next = [...bundle.codeContext, nodeLabel(candidate.node)];
     const evidence = evidenceFor(candidate);
     const projected = { ...bundle, codeContext: next, codeEvidence: [...bundle.codeEvidence, evidence] };
@@ -159,12 +177,54 @@ export function buildContextBundle(
     bundle.codeEvidence.push(evidence);
   }
   bundle.recommendedFiles = [...new Set(bundle.codeEvidence.map((entry) => entry.path).filter((value): value is string => Boolean(value)))].slice(0, 20);
+  if (detail === "source" && options.root) {
+    for (const candidate of [targetNode, ...related.map((item) => item.node)]) {
+      if (bundle.sourceEvidence.length >= 8) break;
+      const snippet = sourceSnippet(options.root, candidate, index);
+      if (!snippet || bundle.sourceEvidence.some((item) => item.path === snippet.path && item.startLine === snippet.startLine)) continue;
+      const projected = { ...bundle, sourceEvidence: [...bundle.sourceEvidence, snippet] };
+      if (estimateTokens(projected) > budgetTokens) continue;
+      bundle.sourceEvidence.push(snippet);
+    }
+  }
   bundle.metrics.selectedNodes = bundle.codeContext.length;
   bundle.metrics.omittedNodes = related.length - bundle.codeContext.length;
   bundle.metrics.truncated = bundle.metrics.omittedNodes > 0;
   bundle.metrics.estimatedTokens = estimateTokens(bundle);
   bundle.secretFlagged = containsSecrets(JSON.stringify(bundle));
   return bundle;
+}
+
+function sourceSnippet(root: string, node: GraphNode, index: CodeGraphIndex): BundleSourceEvidence | null {
+  if (!("path" in node) || typeof node.path !== "string") return null;
+  const repositoryRoot = path.resolve(root);
+  const file = path.resolve(repositoryRoot, node.path);
+  if (file !== repositoryRoot && !file.startsWith(repositoryRoot + path.sep)) return null;
+  let content: string;
+  try {
+    const stat = fs.statSync(file);
+    if (!stat.isFile() || stat.size > 1_048_576) return null;
+    content = fs.readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+  const lines = content.split("\n");
+  const parsed = [...index.parsedFiles.entries()].find(([filePath]) => filePath.toString() === node.path)?.[1];
+  const symbol = parsed?.symbols.find((item) => item.name === node.name || ("line" in node && item.startLine === node.line));
+  const declaredLine = symbol?.startLine ?? ("line" in node && typeof node.line === "number" ? node.line : 1);
+  const declaredEnd = symbol?.endLine ?? declaredLine + 8;
+  const startLine = Math.max(1, declaredLine - 2);
+  const endLine = Math.min(lines.length, Math.min(declaredEnd + 2, startLine + 79));
+  const text = lines.slice(startLine - 1, endLine).join("\n");
+  if (!text || containsSecrets(text)) return null;
+  return {
+    path: node.path,
+    startLine,
+    endLine,
+    text,
+    provenance: "source",
+    selectionReason: `${symbol ? "parser-bounded" : "line-bounded"} evidence around ${nodeLabel(node)}; secret-scanned and limited to ${endLine - startLine + 1} lines`,
+  };
 }
 
 export function estimateTokens(value: unknown): number {
@@ -182,6 +242,14 @@ function findTarget(
   graph: Graph,
   query: string,
 ): { node: GraphNode; score: number } | null {
+  for (const node of graph.nodes()) {
+    if (node.id === query) return { node, score: Number.MAX_SAFE_INTEGER };
+    if ("path" in node && node.path === query) {
+      // An explicit repository path must never be displaced by a symbol whose
+      // name happens to share generic path tokens such as "src" or "parser".
+      if (node.kind === "file") return { node, score: Number.MAX_SAFE_INTEGER };
+    }
+  }
   const tokens = query
     .toLowerCase()
     .split(/[^a-z0-9_]+/)

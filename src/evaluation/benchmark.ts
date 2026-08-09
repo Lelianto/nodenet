@@ -27,6 +27,10 @@ function ratio(numerator: number, denominator: number): number {
   return denominator === 0 ? 1 : Number((numerator / denominator).toFixed(4));
 }
 
+function errorRate(numerator: number, denominator: number): number {
+  return denominator === 0 ? 0 : Number((numerator / denominator).toFixed(4));
+}
+
 function percentile(values: number[], fraction: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -62,8 +66,8 @@ export function scoreBenchmark(cases: LabeledDecisionCase[]): BenchmarkMetrics {
     cases: cases.length,
     reviewerPrecision: ratio(trueReviewers, predictedReviewers),
     reviewerRecall: ratio(trueReviewers, expectedReviewers),
-    falseBlockRate: ratio(falseBlocks, nonBlockingExpected),
-    missedImpactRate: ratio(missedHardened, hardenedExpected),
+    falseBlockRate: errorRate(falseBlocks, nonBlockingExpected),
+    missedImpactRate: errorRate(missedHardened, hardenedExpected),
     outcomeAccuracy: ratio(correctOutcomes, cases.length),
     p50Ms: percentile(cases.map((item) => item.durationMs), 0.5),
     p95Ms: percentile(cases.map((item) => item.durationMs), 0.95),

@@ -4,7 +4,7 @@ import { buildFixtureState, fixtureRoot, tmpDir, copyFixture } from "./helpers.j
 import fs from "node:fs";
 import path from "node:path";
 
-describe("experimental MCP HTTP security guards", () => {
+describe("MCP Streamable HTTP security and lifecycle", () => {
   let running: McpHttpServer | undefined;
   afterEach(async () => { await running?.close(); running = undefined; });
 
@@ -40,6 +40,24 @@ describe("experimental MCP HTTP security guards", () => {
     });
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({ error: "request_body_too_large" });
+  });
+
+  it("assigns, validates, and terminates Streamable HTTP sessions", async () => {
+    const server = await start();
+    const initialize = await fetch(`${server.url}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } }),
+    });
+    expect(initialize.status).toBe(200);
+    expect(initialize.headers.get("mcp-protocol-version")).toBeTruthy();
+    const session = initialize.headers.get("mcp-session-id");
+    expect(session).toBeTruthy();
+    const missing = await fetch(`${server.url}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", "Mcp-Session-Id": "unknown" }, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" }) });
+    expect(missing.status).toBe(404);
+    const closed = await fetch(`${server.url}/mcp`, { method: "DELETE", headers: { "Mcp-Session-Id": session! } });
+    expect(closed.status).toBe(204);
+    expect((await fetch(`${server.url}/mcp`, { headers: { Accept: "text/event-stream" } })).status).toBe(405);
   });
 
   it("refuses remote binding without authentication before listening", async () => {

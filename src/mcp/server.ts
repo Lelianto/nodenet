@@ -41,6 +41,7 @@ import { captureFreshnessBaseline, secureToolOutput, staleInputs, type Freshness
 import { appendAudit } from "../storage/storage.js";
 import path from "node:path";
 import { McpSnapshotStore } from "./snapshot.js";
+import { askGraph, affectedByTarget } from "../ai/retrieval.js";
 
 export const MCP_PROTOCOL_VERSION = "2024-11-05";
 import { NODENET_VERSION } from "../version.js";
@@ -201,7 +202,10 @@ function describeImpact(ctx: McpContext, base: string | undefined): string {
     changedFiles: impact.value.changedFiles.map((f) => f.toString()),
     changedSymbols: impact.value.changedSymbols,
     affectedFiles: impact.value.affectedFiles.map((f) => f.toString()),
+    approvalFiles: impact.value.approvalFiles.map((f) => f.toString()),
     affectedContexts: impact.value.affectedContexts.map((c) => c.id),
+    directContexts: impact.value.directContexts.map((c) => c.id),
+    transitiveContexts: impact.value.transitiveContexts.map((c) => c.id),
     boundaries: impact.value.boundaries,
     owners: impact.value.owners,
   });
@@ -232,6 +236,27 @@ function describeCriticalReview(ctx: McpContext, base: string | undefined): stri
 function buildTools(ctx: McpContext): McpTool[] {
   const { graph, index, ownership, contexts } = ctx.state;
   return [
+    {
+      name: "ask",
+      description: "Retrieve an intent-aware scoped subgraph for a natural-language repository question.",
+      requiredScope: "graph:read",
+      outputSchema: objectOutput("queryId", "intent", "matches", "connections", "primaryFiles", "supportingFiles", "expansionCandidates", "recommendedFiles"),
+      inputSchema: schema({ question: strField("Natural-language repository question"), limit: optIntField("Maximum ranked matches", 1, 20, 5) }, ["question"]),
+      // Keep the MCP default small enough to preserve the declared object
+      // contract under the transport's output budget. Callers can expand it.
+      run: (args) => ok(json(askGraph(graph, String(args["question"] ?? ""), typeof args["limit"] === "number" ? args["limit"] : 5))),
+    },
+    {
+      name: "affected",
+      description: "Explore the hypothetical graph blast radius of a symbol or file before making a change.",
+      requiredScope: "impact:read",
+      outputSchema: objectOutput("target", "depth", "affected", "truncated"),
+      inputSchema: schema({ target: strField("Symbol id, exact name, or file path"), depth: optIntField("Maximum graph depth", 1, ctx.config.limits.maxTraversalDepth, 2) }, ["target"]),
+      run: (args) => {
+        const result = affectedByTarget(graph, ctx.config, String(args["target"] ?? ""), typeof args["depth"] === "number" ? args["depth"] : 2);
+        return result ? ok(json(result)) : err(`No target matched "${String(args["target"] ?? "")}".`);
+      },
+    },
     {
       name: "query",
       description: "Search the repository graph for nodes by name (functions, files, classes, contexts).",
@@ -317,6 +342,7 @@ function buildTools(ctx: McpContext): McpTool[] {
       outputSchema: objectOutput("target", "codeEvidence", "livingContext", "metrics"),
       inputSchema: schema({
         target: strField("Symbol name or file path"),
+        detail: { type: "string", enum: ["map", "evidence", "source"], description: "Progressive evidence detail" },
         maxTokens: optIntField(
           "Advanced override for the automatic MSC output budget; required governance is always retained",
           MIN_CONTEXT_TOKEN_BUDGET,
@@ -332,7 +358,8 @@ function buildTools(ctx: McpContext): McpTool[] {
         if (ambiguous) return err(ambiguous);
         if (candidates.length === 0) return err(`No exact target matched "${target}". Use query to select a stable node id or exact path.`);
         const maxTokens = typeof args["maxTokens"] === "number" ? args["maxTokens"] : undefined;
-        const bundle = buildContextBundle(graph, index, ownership, contexts, candidates[0]!.id, { ...(maxTokens !== undefined ? { maxTokens } : {}) });
+        const detail = ["map", "evidence", "source"].includes(String(args["detail"] ?? "evidence")) ? String(args["detail"] ?? "evidence") as "map" | "evidence" | "source" : "evidence";
+        const bundle = buildContextBundle(graph, index, ownership, contexts, candidates[0]!.id, { ...(maxTokens !== undefined ? { maxTokens } : {}), detail, ...(detail === "source" ? { root: ctx.root } : {}) });
         if (!bundle) return err(`No target matched "${target}". Try a symbol or file name.`);
         return ok(json(bundle));
       },
@@ -390,9 +417,9 @@ function buildTools(ctx: McpContext): McpTool[] {
     },
     {
       name: "reviewers",
-      description: "Resolve reviewers for the current change: suggested, required, authorityRequired with reasons.",
+      description: "Resolve direct approval reviewers separately from suggested and transitive informational reviewers.",
       requiredScope: "governance:read",
-      outputSchema: objectOutput("suggested", "required", "authorityRequired"),
+      outputSchema: objectOutput("suggested", "required", "authorityRequired", "informational"),
       inputSchema: schema({ base: optStrField("Base git ref to compare against (e.g. main)") }, []),
       run: (args) => ok(describeReviewers(ctx, typeof args["base"] === "string" ? args["base"] : undefined)),
     },

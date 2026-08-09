@@ -6,12 +6,19 @@ import type { ArtifactNode } from "../graph/nodes.js";
 import type { ScanEntry } from "../scanner/scanner.js";
 import { makeEdgeId, makeNodeId } from "./code-graph.js";
 
-export interface ArtifactStats { documents: number; apiOperations: number; databaseTables: number; infrastructureResources: number }
+export interface ArtifactStats { documents: number; apiOperations: number; databaseTables: number; infrastructureResources: number; mediaAssets: number; mediaConcepts: number }
+
+const MEDIA_EXTENSION = /\.(pdf|png|jpe?g|webp|gif|svg|mp4|mov|mp3|wav|m4a)$/i;
+const MAX_MEDIA_SIDECAR_BYTES = 64 * 1024;
 
 export function attachRepositoryArtifacts(graph: Graph, entries: ScanEntry[]): ArtifactStats {
-  const stats: ArtifactStats = { documents: 0, apiOperations: 0, databaseTables: 0, infrastructureResources: 0 };
+  const stats: ArtifactStats = { documents: 0, apiOperations: 0, databaseTables: 0, infrastructureResources: 0, mediaAssets: 0, mediaConcepts: 0 };
   for (const entry of entries) {
     const rel = entry.relPath.toString();
+    if (MEDIA_EXTENSION.test(rel)) {
+      attachMediaArtifact(graph, entry, stats);
+      continue;
+    }
     if (!/\.(md|ya?ml|json|sql|tf)$/i.test(rel)) continue;
     let content: string;
     try { content = fs.readFileSync(entry.absPath, "utf8"); } catch { continue; }
@@ -43,6 +50,49 @@ export function attachRepositoryArtifacts(graph: Graph, entries: ScanEntry[]): A
     }
   }
   return stats;
+}
+
+function attachMediaArtifact(graph: Graph, entry: ScanEntry, stats: ArtifactStats): void {
+  const rel = entry.relPath.toString();
+  const ext = path.extname(rel).toLowerCase();
+  const mediaKind = mediaKindFor(ext);
+  const sidecar = readMediaSidecar(`${entry.absPath}.nodenet.json`);
+  const parent = addArtifact(graph, {
+    kind: "document", id: makeNodeId("artifact", "media", rel), name: path.basename(rel), path: entry.relPath,
+    artifactType: "media", candidate: true, mediaKind, ...(sidecar.summary ? { summary: sidecar.summary } : {}),
+  });
+  stats.mediaAssets++;
+  for (const [index, concept] of sidecar.concepts.entries()) {
+    const node = addArtifact(graph, {
+      kind: "document", id: makeNodeId("artifact", "media-concept", rel, String(index)), name: concept,
+      path: entry.relPath, artifactType: "media", candidate: true, mediaKind,
+    });
+    graph.addEdge({
+      id: makeEdgeId(parent.id, "documents", node.id), from: parent.id, to: node.id, relation: "documents",
+      provenance: { source: "inferred", classification: "INFERRED", location: `${rel}.nodenet.json` },
+    });
+    stats.mediaConcepts++;
+  }
+}
+
+function mediaKindFor(ext: string): NonNullable<ArtifactNode["mediaKind"]> {
+  if ([".mp4", ".mov"].includes(ext)) return "video";
+  if ([".mp3", ".wav", ".m4a"].includes(ext)) return "audio";
+  if (ext === ".pdf") return "document";
+  return "image";
+}
+
+function readMediaSidecar(filename: string): { summary?: string; concepts: string[] } {
+  try {
+    const stat = fs.statSync(filename);
+    if (stat.size > MAX_MEDIA_SIDECAR_BYTES) return { concepts: [] };
+    const value = JSON.parse(fs.readFileSync(filename, "utf8")) as Record<string, unknown>;
+    const summary = typeof value["summary"] === "string" ? value["summary"].slice(0, 2_000) : undefined;
+    const concepts = Array.isArray(value["concepts"])
+      ? value["concepts"].filter((item): item is string => typeof item === "string").map((item) => item.trim().slice(0, 200)).filter(Boolean).slice(0, 50)
+      : [];
+    return { ...(summary ? { summary } : {}), concepts };
+  } catch { return { concepts: [] }; }
 }
 
 function addArtifact(graph: Graph, node: ArtifactNode): ArtifactNode { graph.addNode(node); return node; }

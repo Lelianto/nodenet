@@ -19,6 +19,25 @@ Every `github pr` evaluation appends a source-free event to
 version, LCDD version, rollout mode, outcome, counts, repository/PR identity,
 and override metadata. It does not contain source code or tokens.
 
+For executable self-validation, NodeNet now generates actual results from its
+own engines instead of requiring them to be hard-coded in the dataset:
+
+```bash
+nodenet benchmark-languages
+nodenet benchmark-retrieval --dataset retrieval-cases.json
+nodenet benchmark-governance --dataset governance-cases.json
+```
+
+The three reports cover per-language precision/recall, retrieval file and
+mandatory-Context recall plus token reduction, and the complete impact →
+reviewer → decision pipeline respectively.
+
+Reviewer evaluation separates the conservative blast radius from the approval
+radius. Only changed files and one-hop code dependencies may create direct
+ownership, CODEOWNERS, or context approval requirements. Transitive-only owners
+and approvers remain visible in the `informational` bucket and cannot block a
+change. Each reviewer includes an evidence scope and deterministic score.
+
 ## Emergency override
 
 First run the analysis with `--json` and copy its `decisionId`. Then run the

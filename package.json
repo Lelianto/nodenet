@@ -1,6 +1,6 @@
 {
   "name": "@antihero/nodenet",
-  "version": "0.5.0",
+  "version": "0.6.0-beta.1",
   "description": "NodeNet maps code, living context, ownership, and authority into an explainable graph — so humans and AI know what a change affects and who must review it. Deterministic, local-first, zero LLM/vector dependencies.",
   "keywords": [
     "graph",
@@ -85,6 +85,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "benchmark:governance": "node scripts/benchmark-governance-fixture.mjs",
+    "benchmark:languages": "node dist/cli/cli.js benchmark-languages --json",
+    "test:e2e:self": "node scripts/e2e-self.mjs",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

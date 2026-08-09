@@ -65,6 +65,27 @@ describe("nodenet CLI", () => {
     expect(output).toContain("add");
   });
 
+  it("ask, affected, and progressive source context expose retrieval UX", async () => {
+    const repo = work("cross-team");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const asked = captureStdout(() => runCli(["ask", "what connects checkout to payment", "--json"], { cwd: repo }));
+    expect(await asked.result).toBe(0);
+    expect(JSON.parse(asked.output).matches.length).toBeGreaterThan(0);
+    const affected = captureStdout(() => runCli(["affected", "PaymentService", "--json"], { cwd: repo }));
+    expect(await affected.result).toBe(0);
+    expect(JSON.parse(affected.output).affected.length).toBeGreaterThan(0);
+    const context = captureStdout(() => runCli(["context", "createSettlement", "--detail", "source", "--json"], { cwd: repo }));
+    expect(await context.result).toBe(0);
+    expect(JSON.parse(context.output).sourceEvidence.length).toBeGreaterThan(0);
+  });
+
+  it("runs the executable ten-language benchmark", async () => {
+    const repo = work("basic-typescript");
+    const result = captureStdout(() => runCli(["benchmark-languages", "--json"], { cwd: repo }));
+    expect(await result.result).toBe(0);
+    expect(JSON.parse(result.output)).toMatchObject({ cases: 20, passed: 20, passRate: 1 });
+  });
+
   it("context lists living contexts", async () => {
     const repo = work("cross-team");
     expect(await runCli(["build"], { cwd: repo })).toBe(0);

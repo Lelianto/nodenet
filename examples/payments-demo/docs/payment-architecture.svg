@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="100" role="img" aria-label="Payment settlement architecture">
+  <rect width="320" height="100" fill="#f5f7ff"/>
+  <text x="16" y="35">Checkout → Payment approval</text>
+  <text x="16" y="70">Payment → Settlement repository</text>
+</svg>

@@ -1,0 +1,71 @@
+[
+  {
+    "id": "parser-intelligence", "split": "training",
+    "question": "where are polyglot language parsers and their benchmarks",
+    "expectedFiles": ["src/parser/polyglot.ts", "src/evaluation/language-benchmark.ts"],
+    "supportingFiles": ["src/parser/registry.ts", "test/language-benchmark.test.ts"],
+    "mandatoryContexts": ["NN-LANG-001"]
+  },
+  {
+    "id": "mcp-security", "split": "training",
+    "question": "how are MCP authorization secrets and stale snapshots protected",
+    "expectedFiles": ["src/mcp/snapshot.ts", "src/mcp/server.ts"],
+    "supportingFiles": ["src/mcp/security.ts", "src/mcp/http.ts", "test/mcp-http.test.ts"],
+    "mandatoryContexts": ["NN-SEC-001"]
+  },
+  {
+    "id": "governance-quality", "split": "training",
+    "question": "where are buildGovernanceDecision and scoreBenchmark implemented",
+    "expectedFiles": ["src/governance/decision.ts", "src/evaluation/benchmark.ts"],
+    "supportingFiles": ["src/evaluation/governance-benchmark.ts", "src/review/resolver.ts"],
+    "mandatoryContexts": ["NN-GOV-001"]
+  },
+  {
+    "id": "context-cache", "split": "holdout",
+    "question": "where are context bundle caching and cache keys implemented",
+    "expectedFiles": ["src/ai/context-cache.ts", "src/ai/context-builder.ts"],
+    "supportingFiles": ["test/retrieval.test.ts"], "mandatoryContexts": []
+  },
+  {
+    "id": "language-registry", "split": "holdout",
+    "question": "where are language adapters registered and language support detected",
+    "expectedFiles": ["src/parser/registry.ts", "src/parser/polyglot.ts"],
+    "supportingFiles": ["src/parser/typescript.ts", "test/language-support.test.ts"],
+    "mandatoryContexts": ["NN-LANG-001"]
+  },
+  {
+    "id": "mcp-http-transport", "split": "holdout",
+    "question": "where are MCP Streamable HTTP server and protocol sessions implemented",
+    "expectedFiles": ["src/mcp/http.ts", "src/mcp/server.ts"],
+    "supportingFiles": ["test/mcp-http.test.ts", "src/mcp/execution.ts"],
+    "mandatoryContexts": ["NN-SEC-001"]
+  },
+  {
+    "id": "ownership-resolution", "split": "holdout",
+    "question": "where are ownership overrides and owner resolution implemented",
+    "expectedFiles": ["src/ownership/resolver.ts", "src/config/config.ts"],
+    "supportingFiles": ["src/ownership/schema.ts", "test/ownership.test.ts"],
+    "mandatoryContexts": []
+  },
+  {
+    "id": "media-ingestion", "split": "holdout",
+    "question": "where are media sidecar concepts and repository artifacts ingested",
+    "expectedFiles": ["src/analyzer/artifacts.ts"],
+    "supportingFiles": ["test/artifacts.test.ts", "src/graph/nodes.ts"],
+    "mandatoryContexts": []
+  },
+  {
+    "id": "retrieval-evaluation", "split": "holdout",
+    "question": "where are retrieval benchmark nDCG and reciprocal rank calculated",
+    "expectedFiles": ["src/evaluation/retrieval-benchmark.ts"],
+    "supportingFiles": ["src/ai/retrieval.ts", "test/retrieval.test.ts"],
+    "mandatoryContexts": ["NN-GOV-001"]
+  },
+  {
+    "id": "html-visualization", "split": "holdout",
+    "question": "where are interactive graph HTML and governance map rendered",
+    "expectedFiles": ["src/visualization/html.ts", "src/visualization/governance-map.ts"],
+    "supportingFiles": ["src/visualization/layout.ts", "test/visualization.test.ts"],
+    "mandatoryContexts": []
+  }
+]

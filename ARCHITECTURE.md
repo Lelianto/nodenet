@@ -11,7 +11,7 @@ never physically separated.
 flowchart TD
     repository["Repository"] -->|"nodenet build"| scanner["Bounded repository scanner"]
     scanner --> parser["Language adapters"]
-    scanner --> artifacts["ADR, OpenAPI, SQL, and Terraform ingestion"]
+    scanner --> artifacts["ADR, OpenAPI, SQL, Terraform, and media-candidate ingestion"]
     parser --> codeGraph["Two-phase code graph builder"]
     artifacts --> codeGraph
     codeGraph --> unified["Unified graph"]
@@ -47,14 +47,14 @@ context + ownership from disk.
 | `src/integration/` | Reversible query-first guidance installers for Codex, Claude, Cursor, and Agent Skills |
 | `src/review/` | Severity derivation, reviewer resolution with dedup |
 | `src/health/` | Metrics derived strictly from graph state |
-| `src/ai/` | Minimum Sufficient Context bundle builder |
+| `src/ai/` | Intent-aware retrieval, hypothetical affected analysis, progressive MSC, safe cache, and opt-in feedback |
 | `src/storage/` | `.nodenet/` persistence, fingerprint index, symbol cache, audit log |
 | `src/visualization/` | Self-contained governance map: community layout, semantic shapes, authority rings, change-decision overlay, evidence inspector |
 | `src/github/` | GitHub REST client (global fetch), PR comment builder, PR integration (`github pr`) |
 | `src/mcp/` | MCP stdio plus experimental HTTP controls: scoped access, rate limits, immutable snapshots, cancellable workers, output security/contracts |
 | `src/governance/` | Stable governance decisions, audit events, quality gates, and emergency overrides |
 | `src/identity/` | Actor identity, role bindings, repository/context scope, and signed override verification |
-| `src/evaluation/` | Historical GitHub import, isolated replay, blind labeling, and decision-quality reports |
+| `src/evaluation/` | Executable language/retrieval/governance benchmarks, historical replay, blind labeling, and decision-quality reports |
 | `src/onboarding/` | Safe bootstrap and repository-readiness checks |
 | `src/cli/` | All commands (spec §54) |
 
@@ -75,8 +75,8 @@ context + ownership from disk.
    (Valibot) at every external boundary; resource limits fail safely.
 6. **One package.** NodeNet is a single package until real boundaries justify
    splitting (`@nodenet/core`, `@nodenet/github`, ...) — spec §67.
-7. **Local HTTP is an explicit experimental boundary.** The HTTP bridge is not
-   MCP Streamable HTTP. It defaults to loopback and adds scoped authorization,
+7. **Streamable HTTP remains a hardened explicit boundary.** It defaults to
+   loopback and adds sessions, scoped authorization,
    rate limiting, atomic snapshot reload, cancellable execution, and bounded
    output around the same deterministic tool handlers used by stdio.
 

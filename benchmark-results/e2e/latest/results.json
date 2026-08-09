@@ -1,0 +1,379 @@
+{
+  "schemaVersion": "1",
+  "generatedAt": "2026-08-09T10:31:08.518Z",
+  "repository": "NodeNet self-dogfood",
+  "retrieval": [
+    {
+      "id": "parser-intelligence",
+      "split": "training",
+      "expectedFiles": [
+        "src/parser/polyglot.ts",
+        "src/evaluation/language-benchmark.ts"
+      ],
+      "supportingFiles": [
+        "src/parser/registry.ts",
+        "test/language-benchmark.test.ts"
+      ],
+      "selectedFiles": [
+        "src/parser/polyglot.ts",
+        "src/evaluation/language-benchmark.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9908,
+      "estimatedTokens": 778,
+      "pass": true
+    },
+    {
+      "id": "mcp-security",
+      "split": "training",
+      "expectedFiles": [
+        "src/mcp/snapshot.ts",
+        "src/mcp/server.ts"
+      ],
+      "supportingFiles": [
+        "src/mcp/security.ts",
+        "src/mcp/http.ts",
+        "test/mcp-http.test.ts"
+      ],
+      "selectedFiles": [
+        "src/mcp/server.ts",
+        "src/mcp/snapshot.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9696,
+      "estimatedTokens": 701,
+      "pass": true
+    },
+    {
+      "id": "governance-quality",
+      "split": "training",
+      "expectedFiles": [
+        "src/governance/decision.ts",
+        "src/evaluation/benchmark.ts"
+      ],
+      "supportingFiles": [
+        "src/evaluation/governance-benchmark.ts",
+        "src/review/resolver.ts"
+      ],
+      "selectedFiles": [
+        "src/governance/decision.ts",
+        "src/evaluation/benchmark.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9651,
+      "estimatedTokens": 1147,
+      "pass": true
+    },
+    {
+      "id": "context-cache",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/ai/context-cache.ts",
+        "src/ai/context-builder.ts"
+      ],
+      "supportingFiles": [
+        "test/retrieval.test.ts"
+      ],
+      "selectedFiles": [
+        "src/ai/context-builder.ts",
+        "src/ai/context-cache.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.958,
+      "estimatedTokens": 2066,
+      "pass": true
+    },
+    {
+      "id": "language-registry",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/parser/registry.ts",
+        "src/parser/polyglot.ts"
+      ],
+      "supportingFiles": [
+        "src/parser/typescript.ts",
+        "test/language-support.test.ts"
+      ],
+      "selectedFiles": [
+        "src/parser/registry.ts",
+        "src/parser/polyglot.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9884,
+      "estimatedTokens": 1208,
+      "pass": true
+    },
+    {
+      "id": "mcp-http-transport",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/mcp/http.ts",
+        "src/mcp/server.ts"
+      ],
+      "supportingFiles": [
+        "test/mcp-http.test.ts",
+        "src/mcp/execution.ts"
+      ],
+      "selectedFiles": [
+        "src/mcp/http.ts",
+        "src/mcp/server.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9769,
+      "estimatedTokens": 2063,
+      "pass": true
+    },
+    {
+      "id": "ownership-resolution",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/ownership/resolver.ts",
+        "src/config/config.ts"
+      ],
+      "supportingFiles": [
+        "src/ownership/schema.ts",
+        "test/ownership.test.ts"
+      ],
+      "selectedFiles": [
+        "src/ownership/resolver.ts",
+        "src/config/config.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9595,
+      "estimatedTokens": 2031,
+      "pass": true
+    },
+    {
+      "id": "media-ingestion",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/analyzer/artifacts.ts"
+      ],
+      "supportingFiles": [
+        "test/artifacts.test.ts",
+        "src/graph/nodes.ts"
+      ],
+      "selectedFiles": [
+        "src/analyzer/artifacts.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9085,
+      "estimatedTokens": 2073,
+      "pass": true
+    },
+    {
+      "id": "retrieval-evaluation",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/evaluation/retrieval-benchmark.ts"
+      ],
+      "supportingFiles": [
+        "src/ai/retrieval.ts",
+        "test/retrieval.test.ts"
+      ],
+      "selectedFiles": [
+        "src/evaluation/retrieval-benchmark.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9773,
+      "estimatedTokens": 2027,
+      "pass": true
+    },
+    {
+      "id": "html-visualization",
+      "split": "holdout",
+      "expectedFiles": [
+        "src/visualization/html.ts",
+        "src/visualization/governance-map.ts"
+      ],
+      "supportingFiles": [
+        "src/visualization/layout.ts",
+        "test/visualization.test.ts"
+      ],
+      "selectedFiles": [
+        "src/visualization/governance-map.ts",
+        "src/visualization/html.ts"
+      ],
+      "filePrecision": 1,
+      "usefulPrecision": 1,
+      "fileRecall": 1,
+      "mandatoryContextRecall": 1,
+      "reciprocalRank": 1,
+      "ndcg": 0.9246,
+      "estimatedTokens": 926,
+      "pass": true
+    }
+  ],
+  "retrievalSummary": {
+    "overall": {
+      "cases": 10,
+      "primaryPrecision": 1,
+      "essentialRecall": 1,
+      "usefulPrecision": 1,
+      "mandatoryContextRecall": 1,
+      "mrr": 1,
+      "ndcg": 0.9619,
+      "gatesPassed": 10
+    },
+    "training": {
+      "cases": 3,
+      "primaryPrecision": 1,
+      "essentialRecall": 1,
+      "usefulPrecision": 1,
+      "mandatoryContextRecall": 1,
+      "mrr": 1,
+      "ndcg": 0.9752,
+      "gatesPassed": 3
+    },
+    "holdout": {
+      "cases": 7,
+      "primaryPrecision": 1,
+      "essentialRecall": 1,
+      "usefulPrecision": 1,
+      "mandatoryContextRecall": 1,
+      "mrr": 1,
+      "ndcg": 0.9562,
+      "gatesPassed": 7
+    }
+  },
+  "changes": [
+    {
+      "id": "parser-change",
+      "changedFileDetected": true,
+      "severity": "HIGH",
+      "affectedFiles": 107,
+      "blastContexts": [
+        "NN-GOV-001",
+        "NN-LANG-001",
+        "NN-SEC-001"
+      ],
+      "approvalContexts": [
+        "NN-LANG-001"
+      ],
+      "contextPrecision": 1,
+      "reviewers": [
+        "language-team"
+      ],
+      "reviewerPrecision": 1,
+      "informationalReviewers": [
+        "governance-team",
+        "security-team"
+      ],
+      "expectedContext": "NN-LANG-001",
+      "expectedReviewer": "language-team",
+      "blastRadiusWarning": true,
+      "pass": true
+    },
+    {
+      "id": "mcp-security-change",
+      "changedFileDetected": true,
+      "severity": "CRITICAL",
+      "affectedFiles": 108,
+      "blastContexts": [
+        "NN-GOV-001",
+        "NN-LANG-001",
+        "NN-SEC-001"
+      ],
+      "approvalContexts": [
+        "NN-SEC-001"
+      ],
+      "contextPrecision": 1,
+      "reviewers": [
+        "security-team"
+      ],
+      "reviewerPrecision": 1,
+      "informationalReviewers": [
+        "governance-team",
+        "language-team"
+      ],
+      "expectedContext": "NN-SEC-001",
+      "expectedReviewer": "security-team",
+      "blastRadiusWarning": true,
+      "pass": true
+    },
+    {
+      "id": "governance-change",
+      "changedFileDetected": true,
+      "severity": "HIGH",
+      "affectedFiles": 108,
+      "blastContexts": [
+        "NN-GOV-001",
+        "NN-LANG-001",
+        "NN-SEC-001"
+      ],
+      "approvalContexts": [
+        "NN-GOV-001"
+      ],
+      "contextPrecision": 1,
+      "reviewers": [
+        "governance-team"
+      ],
+      "reviewerPrecision": 1,
+      "informationalReviewers": [
+        "language-team",
+        "security-team"
+      ],
+      "expectedContext": "NN-GOV-001",
+      "expectedReviewer": "governance-team",
+      "blastRadiusWarning": true,
+      "pass": true
+    }
+  ],
+  "adversarial": {
+    "passed": true,
+    "command": "vitest security + property + MCP HTTP"
+  },
+  "historicalReplay": {
+    "passed": true,
+    "command": "vitest startup-platform historical replay"
+  },
+  "abPilot": {
+    "variantA": {
+      "policy": "broad authored-corpus read",
+      "estimatedTokens": 274129
+    },
+    "variantB": {
+      "policy": "ask + bounded context",
+      "successfulTasks": 10,
+      "tasks": 10,
+      "estimatedTokens": 15020,
+      "tokenReduction": 0.9945
+    }
+  }
+}

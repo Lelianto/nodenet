@@ -32,6 +32,12 @@ nodenet languages --json
 
 ## Verification
 
+Run `nodenet benchmark-languages` for positive and false-positive contracts
+across all ten adapters. The report includes symbol precision/recall, import
+recall, and exact failures per language. This is a regression baseline, not a
+claim of compiler-semantic equivalence; real-repository labeled sampling is
+still required before promoting a language tier.
+
 `test/language-support.test.ts` runs one declaration-and-import contract test
 for every listed language. Additional TypeScript/JavaScript, Python, Go, Java,
 C#, PHP, artifact, impact, governance, security and property tests exercise

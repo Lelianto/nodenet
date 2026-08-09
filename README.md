@@ -67,6 +67,7 @@ artifact ([living-context-driven-development](https://github.com/Lelianto/living
 | Capability | What you get |
 | --- | --- |
 | **Explainable code graph** | Typed nodes + edges with provenance — every connection says *why* it exists |
+| **Token-efficient repository intelligence** | File-ranked `ask` (`primary` → `supporting` → expansion), hypothetical `affected`, progressive MSC, and safe code/docs/media candidates keep AI retrieval scoped |
 | **Living context** | Rules (business, security, compliance) as versioned artifacts with a lifecycle and freshness decay |
 | **Ownership & authority** | Who owns code, who approves changes, ranked from LCDD > NodeNet > CODEOWNERS > git history |
 | **Change impact** | A git diff becomes a symbol-level report: severity, affected code, ownership boundaries |
@@ -76,6 +77,21 @@ artifact ([living-context-driven-development](https://github.com/Lelianto/living
 | **GitHub PR integration** | Post the impact comment and request reviewers on a PR |
 | **Interactive visualization** | Force-directed `graph.html` with communities, search, and filters — plus static SVG export |
 | **Local-first & deterministic** | Core analysis uses no LLM, vector store, network, or repository-code execution; identical input produces identical output |
+
+Latest reproducible results: [initial benchmark report](docs/benchmark-results-2026-08-09.md)
+and [self-repository E2E dogfooding](docs/e2e-self-benchmark-2026-08-09.md).
+
+NodeNet deliberately has two product layers. **Repository Intelligence** helps
+AI understand code and declared context with fewer reads and fewer tokens.
+**Change Governance** turns that understanding into explainable impact,
+required approvals, and `pass` / `warn` / `block` decisions. Token reduction is
+measured together with task success and mandatory-context recall; it is never
+allowed to hide required governance.
+
+Media files are indexed as local, non-authoritative retrieval candidates. An
+optional bounded `<media-file>.nodenet.json` sidecar may provide a `summary` and
+`concepts`; these inferred concepts improve discovery but can never create
+governance authority or a blocking decision by themselves.
 
 ## The problem it solves
 
@@ -216,10 +232,13 @@ nodenet graph     # interactive visualization (.nodenet/graph.html)
 nodenet init             # creates nodenet.config.json + .nodenet/
 nodenet build            # scan, parse, analyze, persist the unified graph
 nodenet query PaymentService
+nodenet ask "what connects checkout to settlement?"
+nodenet affected PaymentService --depth 2
 nodenet trace LoginForm AuthService
 nodenet governed-by PaymentService
 nodenet owner src/payment/PaymentService.ts
 nodenet context "modify payment settlement"   # AI context bundle
+nodenet context PaymentService --detail source # bounded, secret-scanned snippets
 nodenet impact --base main                    # analyze the current change
 nodenet reviewers --base main                 # who should review it
 nodenet report                                # highlights: god nodes, communities, governance
@@ -229,7 +248,7 @@ nodenet graph --change --base main            # overlay impact + governance deci
 nodenet graph -f svg -o graph.svg             # static SVG image
 nodenet changes --base main --refs feature-a feature-b # local multi-branch collision triage
 nodenet install --platform codex              # query-first project guidance
-nodenet serve --port 7341                     # experimental local JSON-RPC bridge
+nodenet serve --port 7341                     # MCP Streamable HTTP
 nodenet serve --token "$TOKEN" --scopes graph:read,context:read
 ```
 
@@ -263,9 +282,12 @@ the full option reference.
 | `update` | Incremental rebuild from changed files (fingerprint-based) |
 | `watch` | Rebuild on file changes |
 | `query <name>` | Find nodes by name |
+| `ask <question>` | Intent-aware scoped graph retrieval with recommended files and next queries |
+| `affected <target>` | Hypothetical graph blast radius before a change exists |
 | `related <name>` | Show direct neighbors of a node |
 | `trace <from> <to>` | Shortest explainable path between two nodes |
-| `context [target]` | List contexts, build an AI context bundle, or `--propose <id>` a Context Change Proposal |
+| `context [target]` | List contexts or build progressive `map`, `evidence`, or bounded `source` MSC output |
+| `feedback --query-id ... --outcome ...` | Record local opt-in retrieval outcomes without changing authority |
 | `explain <name>` | A node and every relationship with provenance |
 | `owner <path-or-symbol>` | Who owns a file or symbol (source + confidence) |
 | `governed-by <name>` | Living contexts governing a node |
@@ -280,6 +302,9 @@ the full option reference.
 | `changes --base <ref> --refs <refs...>` | Compare local branches for graph, context, and ownership collisions |
 | `bootstrap [--github]` | Create starter config, canonical LCDD policy, and optional GitHub workflow without overwriting files |
 | `benchmark --dataset <file>` | Measure reviewer precision/recall, false blocks, missed impacts, accuracy, and p50/p95 latency |
+| `benchmark-languages` | Execute positive and false-positive contracts across all ten adapters |
+| `benchmark-retrieval --dataset <file>` | Execute labeled questions against `ask` and MSC |
+| `benchmark-governance --dataset <file>` | Execute impact, reviewers, and decisions against labeled git-base scenarios |
 | `eval import-github` | Import historical GitHub PR/review metadata into a private local dataset |
 | `eval run` | Replay NodeNet safely against exact historical base/head commits |
 | `eval label` | Open the loopback-only blind-labeling Decision Lab |
@@ -287,7 +312,7 @@ the full option reference.
 | `doctor [--json]` | Report a 0–100 activation-readiness score with remediation steps |
 | `github pr [options]` | Analyze a PR; update an idempotent Check Run, comment, request reviewers, and audit the decision |
 | `mcp` | Run the MCP server over stdio for AI assistants |
-| `serve [--host] [--port] [--token] [--scopes] [--rate-capacity] [--rate-refill] [--reload-interval] [--no-reload]` | Experimental HTTP bridge with scoped access, rate limits, and atomic reload |
+| `serve [--host] [--port] [--token] [--scopes] [--rate-capacity] [--rate-refill] [--reload-interval] [--no-reload]` | MCP Streamable HTTP with sessions, scopes, rate limits, and atomic reload |
 | `audit-verify [--json]` | Verify the tamper-evident local audit hash chain |
 | `install --platform <name>` | Install query-first guidance for Codex, Claude, Cursor, or Agent Skills |
 
@@ -434,7 +459,7 @@ AI coding assistants (Claude Code, Codex, and any MCP client):
 nodenet mcp
 ```
 
-Tools: `query`, `related`, `trace`, `context` (Minimum Sufficient Context —
+Tools: `ask`, `affected`, `query`, `related`, `trace`, `context` (Minimum Sufficient Context —
 secret-scanned), `explain`, `governed_by`, `owner`, `impact`, `reviewers`,
 `health`, `graph`. All results are deterministic and provenance-backed.
 Design: [docs/adr/005-mcp-server.md](docs/adr/005-mcp-server.md). Deployment and
@@ -442,8 +467,8 @@ troubleshooting: [docs/mcp-operations.md](docs/mcp-operations.md).
 
 ## Team setup
 
-NodeNet artifacts are meant to be committed so every developer and CI runner
-starts with the same map:
+Canonical governance artifacts and the generated viewer are committed. The
+machine graph remains generated and is rebuilt locally or in CI:
 
 ```
 # commit these
@@ -455,8 +480,8 @@ nodenet.config.json        # review policy, teams, limits
 
 Recommended workflow:
 
-1. One person runs `nodenet init` + `nodenet build` and commits the artifacts.
-2. Everyone pulls — `query`/`trace`/`impact` work immediately.
+1. One person runs `nodenet init` + `nodenet build` and commits the authored artifacts and viewer.
+2. Everyone pulls and runs `nodenet build` (or `nodenet open`) before `query`/`trace`/`impact`.
 3. `nodenet impact --base main` runs in CI on every PR (and `github pr` posts
    the comment and requests reviewers).
 4. When rules change, edit `.lcdd/contexts/*.yaml` and commit — the lifecycle
@@ -545,6 +570,9 @@ Node 20 and 22.
 - **Phase 9 (done):** ten-language parsing — seven full and three basic adapters
 - **Phase 10 (done):** decision benchmark, audit events, expiring overrides,
   readiness doctor, bootstrap wizard, and design-partner pilot kit
+- **Phase 11 (done):** intent-aware retrieval, hypothetical affected analysis,
+  progressive source evidence, safe cache/feedback, executable benchmarks,
+  and MCP Streamable HTTP
 - **Validation-gated:** organization installation, multi-repository governance,
   centralized Contexts, identity mapping, audit/history UI, and billing
 

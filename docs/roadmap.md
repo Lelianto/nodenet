@@ -18,14 +18,14 @@ security.
 | --- | --- | --- |
 | Local, deterministic parsing (no LLM, no vector store) | ✅ | ✅ |
 | Interactive visualization + communities | ✅ | ✅ |
-| AI / MCP integration | ✅ stdio + loopback-first HTTP | authentication and team hardening |
+| AI / MCP integration | ✅ stdio + scoped MCP Streamable HTTP | pilot deployment validation |
 | Multi-language parsing | ✅ 10 languages: 7 full + 3 basic | deeper semantic resolution per adapter |
-| Assistant skill install | ✅ Codex, Claude, Cursor, Agent Skills | additional platforms |
+| Assistant skill install | ✅ Codex, Claude, Cursor, Agent Skills | demand-led additional platforms |
 | Auto-generated report (god nodes, surprising connections, suggested questions) | ✅ `nodenet report` | ✅ |
 | PR dashboard + merge-order conflict detection | ✅ local multi-ref `changes` | hosted dashboard |
 | Docs / markdown / ADR ingestion as graph nodes | ✅ ADR/OpenAPI/SQL/Terraform | richer cross-links |
 | Git hook auto-rebuild + graph.json merge driver | ❌ | ✅ |
-| Decision benchmark harness | ✅ labeled metrics + CI-ready JSON | publish real pilot results |
+| Decision benchmark harness | ✅ executable language, retrieval, governance, and historical evaluation | publish real pilot results |
 | README translations | 1 language | multiple |
 
 ## Round 1 — distribution & reach (low→medium effort, high impact)

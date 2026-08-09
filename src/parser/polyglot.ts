@@ -89,6 +89,8 @@ function parsePatternLanguage(file: ParsedFile["path"], content: string, limits:
   const input = bounded(content, limits); if (!input.ok) return input;
   const symbols: ParsedSymbol[] = []; const imports: ParsedImport[] = [];
   input.value.forEach((line, index) => {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*") || trimmed.startsWith("*")) return;
     for (const regex of patterns.imports) { const found = line.match(regex)?.[1]; if (found) { imports.push({ specifier: found, bindings: [] }); break; } }
     for (const declaration of patterns.declarations) { const name = line.match(declaration.regex)?.[1]; if (name) { symbols.push(symbol(declaration.kind, name, index + 1, !name.startsWith("_") && !/\bprivate\b/.test(line))); break; } }
   });

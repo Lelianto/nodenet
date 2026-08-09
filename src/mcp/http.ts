@@ -1,4 +1,4 @@
-/** Dependency-free, loopback-by-default MCP HTTP transport. */
+/** Dependency-free, loopback-by-default MCP Streamable HTTP transport. */
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import crypto from "node:crypto";
@@ -8,7 +8,7 @@ import type { LoadedConfig } from "../config/config.js";
 import { captureFreshnessBaseline, staleInputs } from "./security.js";
 import { appendAudit } from "../storage/storage.js";
 import { executeMcpLineIsolated } from "./execution.js";
-import { MCP_SCOPES, type McpContext, type McpScope } from "./server.js";
+import { MCP_PROTOCOL_VERSION, MCP_SCOPES, type McpContext, type McpScope } from "./server.js";
 import { handleMcpLine } from "./server.js";
 import { prepareMcpContext } from "./server.js";
 
@@ -100,6 +100,7 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
   const server = http.createServer((request, response) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Cache-Control", "no-store");
+    response.setHeader("MCP-Protocol-Version", MCP_PROTOCOL_VERSION);
     const access = resolveAccess(request.headers.authorization, options, loopback, ctx.root);
     if (!access.authenticated) {
       const unauthenticatedRate = consumeToken(buckets, `unauth:${request.socket.remoteAddress ?? "unknown"}`, rateCapacity, rateRefillPerSecond);
@@ -132,6 +133,23 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
       response.end(JSON.stringify({ ok: true, graphRevision: ctx.state.graph.metadata.builtAt }));
       return;
     }
+    if (request.url === "/mcp" && request.method === "GET") {
+      // This server has no unsolicited server-message stream. Streamable HTTP
+      // explicitly permits a server to reject GET when it does not offer SSE.
+      response.writeHead(405, { "Content-Type": "application/json", Allow: "POST, DELETE" });
+      response.end(JSON.stringify({ error: "server_event_stream_not_available" }));
+      return;
+    }
+    if (request.url === "/mcp" && request.method === "DELETE") {
+      const sessionId = headerValue(request.headers["mcp-session-id"]);
+      if (!sessionId || !sessions.delete(`${access.sessionKey}:${sessionId}`)) {
+        response.writeHead(404, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "session_not_found" }));
+        return;
+      }
+      response.writeHead(204).end();
+      return;
+    }
     if (request.method !== "POST" || request.url !== "/mcp") {
       response.writeHead(404).end();
       return;
@@ -150,7 +168,7 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
       return;
     }
     const accept = request.headers.accept;
-    if (accept && !accept.includes("application/json") && !accept.includes("*/*")) {
+    if (accept && !accept.includes("application/json") && !accept.includes("text/event-stream") && !accept.includes("*/*")) {
       response.writeHead(406, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ error: "application_json_not_acceptable" }));
       return;
@@ -190,9 +208,9 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
     });
     request.on("end", () => {
       if (tooLarge || settled) return;
-      const sessionKey = access.sessionKey;
+      const requestedSession = headerValue(request.headers["mcp-session-id"]);
+      const sessionKey = requestedSession ? `${access.sessionKey}:${requestedSession}` : access.sessionKey;
       const protocolState = sessions.get(sessionKey) ?? { initialized: false, ready: false, shutdownRequested: false };
-      sessions.set(sessionKey, protocolState);
       const requestCtx: McpContext = {
         ...ctx,
         protocolState,
@@ -209,6 +227,20 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
         method = parsed.method;
         if (typeof parsed.params?.name === "string") toolName = parsed.params.name;
       } catch { /* sync handler returns parse error */ }
+      if (requestedSession && !sessions.has(sessionKey) && method !== "initialize") {
+        response.writeHead(404, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "session_not_found" }));
+        finish();
+        return;
+      }
+      sessions.set(sessionKey, protocolState);
+      if (method === "initialize") {
+        const assigned = requestedSession ?? crypto.randomUUID();
+        sessions.set(`${access.sessionKey}:${assigned}`, protocolState);
+        // Keep the credential-keyed alias for older JSON-only clients.
+        sessions.set(access.sessionKey, protocolState);
+        response.setHeader("Mcp-Session-Id", assigned);
+      }
       const isolated = method === "tools/call" ? executeMcpLineIsolated(requestCtx, line, requestTimeoutMs) : undefined;
       if (!isolated) {
         const result = handleMcpLine(requestCtx, line);
@@ -271,6 +303,11 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
       return new Promise<void>((resolve, reject) => server.close((cause) => cause ? reject(cause) : resolve()));
     },
   };
+}
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  const selected = Array.isArray(value) ? value[0] : value;
+  return selected && /^[A-Za-z0-9._~-]{1,128}$/.test(selected) ? selected : undefined;
 }
 
 function consumeToken(

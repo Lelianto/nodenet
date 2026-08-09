@@ -1,8 +1,9 @@
 # Operating NodeNet MCP safely
 
 This guide explains the current MCP security and reliability controls. The
-stdio server is the recommended local integration. `nodenet serve` remains an
-experimental HTTP JSON-RPC bridge, not full MCP Streamable HTTP.
+stdio server is the recommended single-user integration. `nodenet serve`
+implements MCP Streamable HTTP for shared clients with the same deterministic
+handlers and security boundaries.
 
 ## Local stdio
 
@@ -14,7 +15,7 @@ nodenet mcp
 The client must complete `initialize`, send `notifications/initialized`, and
 then call tools. Governance-sensitive calls fail closed when inputs are stale.
 
-## Shared HTTP bridge
+## Shared MCP Streamable HTTP
 
 ```bash
 export NODENET_MCP_TOKEN="use-a-secret-from-your-secret-manager"
@@ -37,16 +38,23 @@ rejected unless a bearer credential is configured.
 
 | Scope | Tools/capability |
 | --- | --- |
-| `graph:read` | `query`, `related`, `trace`, `explain`, `graph`, `report` |
+| `graph:read` | `ask`, `query`, `related`, `trace`, `explain`, `graph`, `report` |
 | `context:read` | `context`, `governed_by`, `owner` |
-| `impact:read` | `impact` |
+| `impact:read` | `affected`, `impact` |
 | `governance:read` | `reviewers`, `critical_review` |
+
+`reviewers` separates direct `required`/`authorityRequired` approvals from
+transitive-only `informational` evidence. Each reviewer includes a deterministic
+score and evidence scope.
 | `health:read` | HTTP health and the `health` tool |
 
 `tools/list` only advertises available tools. A call outside its scope returns
 JSON-RPC `-32001`. Programmatic deployments can configure multiple
 `McpHttpCredential` records bound to repositories. Lifecycle state and rate
-limits are isolated per credential.
+limits are isolated per credential and MCP session. `initialize` returns an
+`Mcp-Session-Id`; send it on subsequent requests and use `DELETE /mcp` to
+terminate it. NodeNet has no unsolicited server events, so `GET /mcp` returns
+`405`, as permitted by Streamable HTTP.
 
 ### Rate limiting
 
@@ -120,9 +128,9 @@ assurance.
 | `Stale analysis state` | Wait for reload or run `nodenet build`. |
 | `Output contract violation` | Treat as an implementation defect. |
 
-## Remaining boundary
+## Remaining deployment boundary
 
 These controls do not make the HTTP bridge a regulated governance authority.
-Streamable HTTP conformance, TLS termination, external identity, centralized
-tamper-resistant logging, availability engineering, penetration testing, and
-formal residual-risk acceptance remain deployment responsibilities.
+TLS termination, external identity, centralized tamper-resistant logging,
+availability engineering, penetration testing, and formal residual-risk
+acceptance remain deployment responsibilities.

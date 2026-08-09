@@ -11,6 +11,23 @@ const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 describe("local artifact ingestion", () => {
+  it("ingests media and bounded sidecar concepts as non-authoritative candidates", () => {
+    const root = tmpDir(); roots.push(root);
+    fs.writeFileSync(path.join(root, "package.json"), '{"name":"media"}');
+    fs.writeFileSync(path.join(root, "checkout.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    fs.writeFileSync(path.join(root, "checkout.png.nodenet.json"), JSON.stringify({ summary: "Checkout flow", concepts: ["Payment approval", "Settlement"] }));
+    const config = loadConfig(root); if (!config.ok) throw config.error;
+    const build = buildCodeGraph(root, config.value); if (!build.ok) throw build.error;
+    const media = [...build.value.graph.nodes()].filter((node) => "artifactType" in node && node.artifactType === "media");
+    expect(media).toHaveLength(3);
+    expect(media.every((node) => node.candidate === true)).toBe(true);
+    expect([...build.value.graph.edges()].filter((edge) => edge.relation === "documents")).toHaveLength(2);
+    expect([...build.value.graph.edges()].some((edge) => edge.relation === "governed_by")).toBe(false);
+    const saved = saveGraph(root, build.value.graph); if (!saved.ok) throw saved.error;
+    const loaded = loadGraph(root); if (!loaded.ok) throw loaded.error;
+    expect([...(loaded.value?.nodes() ?? [])].some((node) => "artifactType" in node && node.artifactType === "media" && node.candidate)).toBe(true);
+  });
+
   it("extracts ADR, OpenAPI operations, SQL tables, and Terraform resources", () => {
     const root = tmpDir(); roots.push(root);
     fs.mkdirSync(path.join(root, "docs", "adr"), { recursive: true });

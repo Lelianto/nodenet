@@ -12,7 +12,7 @@ import { ok } from "../types/result.js";
 import type { NodeId } from "../types/brand.js";
 import type { SafeRelativePath } from "../security/filesystem.js";
 import type { Graph } from "../graph/graph.js";
-import { collectAffected } from "../graph/traversal.js";
+import { collectAffectedWithDistance } from "../graph/traversal.js";
 import type { CodeGraphIndex } from "../analyzer/code-graph.js";
 import type { ContextRecord } from "../context/schema.js";
 import type { OwnershipIndex } from "../ownership/resolver.js";
@@ -62,8 +62,14 @@ export interface ImpactReport {
   changedFiles: SafeRelativePath[];
   changedSymbols: SymbolChange[];
   affectedFiles: SafeRelativePath[];
+  /** Changed files plus one-hop code dependencies used for approval routing. */
+  approvalFiles: SafeRelativePath[];
   affectedNodeIds: NodeId[];
   affectedContexts: ContextRecord[];
+  /** Contexts whose appliesTo pattern matches a changed file directly. */
+  directContexts: ContextRecord[];
+  /** Contexts reached only through the broader blast radius. */
+  transitiveContexts: ContextRecord[];
   boundaries: BoundaryCrossing[];
   owners: AffectedOwner[];
   reasons: string[];
@@ -158,7 +164,7 @@ export function analyzeImpact(
     if (fileNodeId) seeds.add(fileNodeId);
   }
 
-  const affectedSet = collectAffected(
+  const affectedDistances = collectAffectedWithDistance(
     graph,
     [...seeds],
     {
@@ -167,18 +173,25 @@ export function analyzeImpact(
     },
     (edge) => edge.relation !== "contains",
   );
+  const affectedSet = new Set(affectedDistances.keys());
   const affectedNodeIds = [...affectedSet];
 
   const affectedFiles = new Set<SafeRelativePath>();
+  const approvalFiles = new Set<SafeRelativePath>(changedFiles);
   for (const id of affectedSet) {
     const node = graph.getNode(id);
     if (node?.kind === "file") {
       affectedFiles.add((node as { path: SafeRelativePath }).path);
     }
+    if ((affectedDistances.get(id) ?? Number.POSITIVE_INFINITY) <= 1 && node && "path" in node && typeof node.path === "string") {
+      approvalFiles.add(node.path as SafeRelativePath);
+    }
   }
 
   // 4. Contexts ----------------------------------------------------------------
   const affectedContexts: ContextRecord[] = [];
+  const directContexts: ContextRecord[] = [];
+  const transitiveContexts: ContextRecord[] = [];
   const seenContexts = new Set<string>();
   for (const ctx of contexts) {
     if (seenContexts.has(ctx.id)) continue;
@@ -187,6 +200,9 @@ export function analyzeImpact(
     );
     if (applies) {
       affectedContexts.push(ctx);
+      const direct = ctx.appliesTo.some((pattern) => [...approvalFiles].some((file) => matchGlob(pattern, file.toString())));
+      if (direct) directContexts.push(ctx);
+      else transitiveContexts.push(ctx);
       seenContexts.add(ctx.id);
     }
   }
@@ -220,8 +236,11 @@ export function analyzeImpact(
     changedFiles: [...changedFiles],
     changedSymbols,
     affectedFiles: [...affectedFiles],
+    approvalFiles: [...approvalFiles],
     affectedNodeIds,
     affectedContexts,
+    directContexts,
+    transitiveContexts,
     boundaries,
     owners,
     reasons,

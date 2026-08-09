@@ -57,9 +57,16 @@ describe("MCP server protocol", () => {
     const res = send(ctx, JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list" }));
     const tools = res?.result?.tools as { name: string }[];
     expect(tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "critical_review", "health", "graph", "report"]),
+      expect.arrayContaining(["ask", "affected", "query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "critical_review", "health", "graph", "report"]),
     );
     expect(tools.every((tool) => (tool as { outputSchema?: unknown }).outputSchema !== undefined)).toBe(true);
+  });
+
+  it("retrieves natural-language matches and hypothetical affected nodes", () => {
+    const ask = call(ctx, 31, "ask", { question: "what connects checkout to payment" });
+    expect(JSON.parse(toolText(ask!)).matches.length).toBeGreaterThan(0);
+    const affected = call(ctx, 32, "affected", { target: "PaymentService", depth: 2 });
+    expect(JSON.parse(toolText(affected!)).affected.length).toBeGreaterThan(0);
   });
 
   it("rejects malformed JSON with a parse error", () => {

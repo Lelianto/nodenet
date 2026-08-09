@@ -11,6 +11,8 @@ coverage/
 **/.nodenet/metadata.json
 **/.nodenet/symbols.json
 **/.nodenet/parse-cache.json
+**/.nodenet/context-cache.json
+**/.nodenet/retrieval-feedback.jsonl
 **/.nodenet/audit.jsonl
 **/.nodenet/overrides.jsonl
 **/.nodenet/evaluation/

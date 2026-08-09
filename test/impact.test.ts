@@ -62,6 +62,8 @@ describe("NodeNet MVP: Checkout Team changes CheckoutService", () => {
     const contextIds = report.affectedContexts.map((c) => c.id);
     expect(contextIds).toContain("PAYMENT-003");
     expect(contextIds).toContain("SEC-009");
+    expect(report.directContexts.map((context) => context.id)).toEqual(expect.arrayContaining(["PAYMENT-003", "SEC-009"]));
+    expect(report.approvalFiles.map((file) => file.toString())).toContain("src/payment/PaymentService.ts");
   });
 
   it("resolves reviewers: payment-team required, finance-team + security-team authority", () => {
@@ -82,6 +84,8 @@ describe("NodeNet MVP: Checkout Team changes CheckoutService", () => {
     expect(payment?.reasons.some((r) => r.includes("owned by payment-team"))).toBe(true);
     const finance = review.authorityRequired.find((r) => r.target === "finance-team");
     expect(finance?.reasons.some((r) => r.includes("PAYMENT-003") && r.includes("approval"))).toBe(true);
+    expect(finance?.score).toBe(1);
+    expect(finance?.evidenceScope).toBe("direct");
   });
 
   it("deduplicates reviewers across sources (spec §58)", () => {

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "current-change-against-main",
+    "base": "main",
+    "expectedOutcome": "block",
+    "expectedReviewers": ["payment-team", "security-team", "finance-team"],
+    "hardenedImpactExpected": true,
+    "mode": "warn"
+  }
+]

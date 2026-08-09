@@ -43,8 +43,12 @@ export type {
 } from "./report/report.js";
 
 export { buildContextBundle } from "./ai/context-builder.js";
+export { askGraph, affectedByTarget } from "./ai/retrieval.js";
+export type { AskResult, AskMatch, AskConnection, RankedFile, AffectedResult } from "./ai/retrieval.js";
+export { appendRetrievalFeedback, RETRIEVAL_OUTCOMES } from "./ai/feedback.js";
+export type { RetrievalFeedback, RetrievalOutcome } from "./ai/feedback.js";
 export { estimateTokens, DEFAULT_CONTEXT_TOKEN_BUDGET, MIN_CONTEXT_TOKEN_BUDGET, MAX_CONTEXT_TOKEN_BUDGET } from "./ai/context-builder.js";
-export type { ContextBundle, ContextBundleMetrics, ContextBundleOptions, BundleContextRef, BundleOwner, BundleGuidance, BundleCodeEvidence } from "./ai/context-builder.js";
+export type { ContextBundle, ContextBundleMetrics, ContextBundleOptions, BundleContextRef, BundleOwner, BundleGuidance, BundleCodeEvidence, BundleSourceEvidence } from "./ai/context-builder.js";
 
 export { loadContexts } from "./context/loader.js";
 export { transitionContext, applyDecay, canTransition, allTransitions } from "./context/lifecycle.js";
@@ -126,6 +130,12 @@ export {
 export type { DecisionAuditInput, DecisionOverride } from "./governance/audit.js";
 export { NODENET_VERSION } from "./version.js";
 export { loadBenchmarkCases, scoreBenchmark } from "./evaluation/benchmark.js";
+export { runLanguageBenchmark, BUILTIN_LANGUAGE_BENCHMARK } from "./evaluation/language-benchmark.js";
+export type { LanguageBenchmarkCase, LanguageBenchmarkRow, LanguageBenchmarkReport } from "./evaluation/language-benchmark.js";
+export { loadRetrievalBenchmark, runRetrievalBenchmark } from "./evaluation/retrieval-benchmark.js";
+export type { RetrievalBenchmarkCase, RetrievalCaseResult, RetrievalBenchmarkReport } from "./evaluation/retrieval-benchmark.js";
+export { loadExecutableGovernanceCases, runGovernanceBenchmark } from "./evaluation/governance-benchmark.js";
+export type { ExecutableGovernanceCase, GovernanceBenchmarkReport } from "./evaluation/governance-benchmark.js";
 export type { BenchmarkMetrics, LabeledDecisionCase } from "./evaluation/benchmark.js";
 export { assessReadiness } from "./onboarding/readiness.js";
 export type { ReadinessCheck, ReadinessReport } from "./onboarding/readiness.js";

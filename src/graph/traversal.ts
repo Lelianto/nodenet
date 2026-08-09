@@ -75,6 +75,34 @@ export function collectAffected(
   return traverseBfs(graph, seeds, "both", limits, predicate).visited;
 }
 
+/** Collect reachable nodes with their shortest unweighted hop distance. */
+export function collectAffectedWithDistance(
+  graph: Graph,
+  seeds: readonly NodeId[],
+  limits: TraversalLimits,
+  predicate: (edge: GraphEdge) => boolean = () => true,
+): Map<NodeId, number> {
+  const distances = new Map<NodeId, number>();
+  let frontier: NodeId[] = [];
+  for (const seed of seeds) { if (!distances.has(seed)) { distances.set(seed, 0); frontier.push(seed); } }
+  let depth = 0;
+  while (frontier.length > 0 && depth < limits.maxDepth && distances.size < limits.maxNodes) {
+    const next: NodeId[] = [];
+    for (const id of frontier) {
+      for (const edge of graph.incident(id)) {
+        if (!predicate(edge)) continue;
+        const neighbor = edge.from === id ? edge.to : edge.from;
+        if (distances.has(neighbor)) continue;
+        distances.set(neighbor, depth + 1); next.push(neighbor);
+        if (distances.size >= limits.maxNodes) break;
+      }
+      if (distances.size >= limits.maxNodes) break;
+    }
+    frontier = next; depth++;
+  }
+  return distances;
+}
+
 /** Shortest path (by edge count) between two nodes, or null. */
 export function findPath(
   graph: Graph,
