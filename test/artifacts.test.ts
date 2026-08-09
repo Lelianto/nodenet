@@ -5,6 +5,7 @@ import { buildCodeGraph } from "../src/analyzer/code-graph.js";
 import { loadConfig } from "../src/config/config.js";
 import { languageSupportMatrix, registeredLanguageAdapters } from "../src/parser/registry.js";
 import { tmpDir } from "./helpers.js";
+import { loadGraph, saveGraph } from "../src/storage/storage.js";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
@@ -61,6 +62,19 @@ describe("local artifact ingestion", () => {
     expect(nodes.some((node) => node.kind === "method" && node.name === "Reset" && !node.exported)).toBe(true);
     expect(nodes.some((node) => node.kind === "method" && node.name === "settle" && node.exported)).toBe(true);
     expect(nodes.some((node) => node.kind === "method" && node.name === "reset" && !node.exported)).toBe(true);
+  });
+
+  it("preserves file languages when a graph is persisted and loaded", () => {
+    const root = tmpDir(); roots.push(root);
+    fs.writeFileSync(path.join(root, "package.json"), '{"name":"language-round-trip"}');
+    fs.writeFileSync(path.join(root, "worker.py"), "def process():\n    pass\n");
+    const config = loadConfig(root); if (!config.ok) throw config.error;
+    const build = buildCodeGraph(root, config.value); if (!build.ok) throw build.error;
+    const saved = saveGraph(root, build.value.graph); if (!saved.ok) throw saved.error;
+    const loaded = loadGraph(root); if (!loaded.ok) throw loaded.error;
+    expect(loaded.value).not.toBeNull();
+    const languages = [...(loaded.value?.nodes() ?? [])].filter((node) => node.kind === "file").map((node) => node.language);
+    expect(languages).toContain("python");
   });
 
   it("maps Python, Go, and Java declarations locally", () => {

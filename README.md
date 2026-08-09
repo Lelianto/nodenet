@@ -27,14 +27,8 @@ and who should review it.
 
 **NodeNet maps code, living context, ownership and authority into one
 explainable graph, then answers deterministically what a change breaks and who
-must review it** — locally, with no AI, no vector store, and nothing leaving
-your machine.
-
-```
-CODE          →  CONTEXT      →  OWNERSHIP  →  AUTHORITY   →  CHANGE IMPACT  →  REVIEW
-files, calls,     living rules,   who owns      who approves   what breaks,     who must
-symbols, deps     governance      the code      hardened       what is affected  review it
-```
+must review it** — locally and without an AI or vector store. Network access is
+reserved for workflows that explicitly integrate with services such as GitHub.
 
 It is the practical reference implementation of **Living Context Driven
 Development (LCDD)** — context treated as a living, versioned, governed
@@ -81,7 +75,7 @@ artifact ([living-context-driven-development](https://github.com/Lelianto/living
 | **MCP server** | The whole graph as MCP tools for Claude Code, Codex, and any MCP client |
 | **GitHub PR integration** | Post the impact comment and request reviewers on a PR |
 | **Interactive visualization** | Force-directed `graph.html` with communities, search, and filters — plus static SVG export |
-| **Local-first & deterministic** | No LLM, no vector store, no network, no code execution; identical output for identical input |
+| **Local-first & deterministic** | Core analysis uses no LLM, vector store, network, or repository-code execution; identical input produces identical output |
 
 ## The problem it solves
 
@@ -116,7 +110,8 @@ owns it, and who must review a change.**
 
 Analysis commands (`query`, `related`, `trace`, `impact`, `reviewers`, `health`,
 ...) load the persisted graph, re-validate it at runtime, and answer from one
-unified, explainable model. Nothing ever leaves the machine.
+unified, explainable model. Only explicitly networked workflows such as GitHub
+integration send data off the machine.
 
 ## See it in action
 
@@ -234,7 +229,8 @@ nodenet graph --change --base main            # overlay impact + governance deci
 nodenet graph -f svg -o graph.svg             # static SVG image
 nodenet changes --base main --refs feature-a feature-b # local multi-branch collision triage
 nodenet install --platform codex              # query-first project guidance
-nodenet serve --port 7341                     # shared local HTTP MCP at /mcp
+nodenet serve --port 7341                     # experimental local JSON-RPC bridge
+nodenet serve --token "$TOKEN" --scopes graph:read,context:read
 ```
 
 Incremental builds reuse unchanged local parse results. Built-in deterministic
@@ -291,7 +287,8 @@ the full option reference.
 | `doctor [--json]` | Report a 0–100 activation-readiness score with remediation steps |
 | `github pr [options]` | Analyze a PR; update an idempotent Check Run, comment, request reviewers, and audit the decision |
 | `mcp` | Run the MCP server over stdio for AI assistants |
-| `serve [--host] [--port] [--token]` | Share MCP over loopback-first HTTP |
+| `serve [--host] [--port] [--token] [--scopes] [--rate-capacity] [--rate-refill] [--reload-interval] [--no-reload]` | Experimental HTTP bridge with scoped access, rate limits, and atomic reload |
+| `audit-verify [--json]` | Verify the tamper-evident local audit hash chain |
 | `install --platform <name>` | Install query-first guidance for Codex, Claude, Cursor, or Agent Skills |
 
 ## How governance is declared
@@ -440,7 +437,8 @@ nodenet mcp
 Tools: `query`, `related`, `trace`, `context` (Minimum Sufficient Context —
 secret-scanned), `explain`, `governed_by`, `owner`, `impact`, `reviewers`,
 `health`, `graph`. All results are deterministic and provenance-backed.
-Design: [docs/adr/005-mcp-server.md](docs/adr/005-mcp-server.md).
+Design: [docs/adr/005-mcp-server.md](docs/adr/005-mcp-server.md). Deployment and
+troubleshooting: [docs/mcp-operations.md](docs/mcp-operations.md).
 
 ## Team setup
 
@@ -487,8 +485,11 @@ cd examples/payments-demo
 - Resource limits are configurable and fail safely.
 - Secret-like files are never scanned; AI context output is secret-scanned.
 - Git is invoked with argument arrays only (no shell concatenation).
-- Fully local: no telemetry, no network calls, no data leaves your machine.
-- Least-privilege GitHub integration (`contents: read`, `pull-requests: write`).
+- Core analysis is local and has no telemetry. Network access occurs only for
+  explicit integrations such as GitHub metadata/import and PR automation.
+- Least-privilege GitHub integration requests only the permissions needed for
+  the selected operation (`contents: read`, and when enabled `checks: write`
+  and/or `pull-requests: write`).
 
 See [SECURITY.md](SECURITY.md) and
 [docs/security/threat-model.md](docs/security/threat-model.md).
@@ -502,6 +503,7 @@ See [SECURITY.md](SECURITY.md) and
   - [docs/security/threat-model.md](docs/security/threat-model.md)
 - [SECURITY.md](SECURITY.md) — security guarantees and reporting
 - [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community participation standards
 - [CHANGELOG.md](CHANGELOG.md) — release history
 - [Decision quality and auditability](docs/decision-quality.md) — eval dataset,
   metrics, decision audit, and bounded overrides

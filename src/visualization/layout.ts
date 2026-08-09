@@ -172,7 +172,7 @@ export function layoutGraph(
     }
     // Compact circular communities: enough separation for nodes without
     // turning every cluster into a viewport-sized rectangle.
-    const targetRadius = Math.max(28, 18 * Math.sqrt(m) + 12);
+    const targetRadius = Math.max(38, 26 * Math.sqrt(m) + 18);
     const scale = targetRadius / maxR;
     members.forEach((idx, pos) => {
       const p = positions[pos]!;
@@ -203,7 +203,7 @@ export function layoutGraph(
   // intentionally an unbounded world rather than a clamped rectangular box.
   // Cross-community connectivity slightly pulls related clusters together.
   const golden = Math.PI * (3 - Math.sqrt(5));
-  const communitySpacing = Math.max(85, Math.min(width, height) * 0.13);
+  const communitySpacing = Math.max(120, Math.min(width, height) * 0.18);
   const centers: Point[] = communityIds.map((_community, i) => {
     if (i === 0) return { x: 0, y: 0 };
     const radius = communitySpacing * Math.sqrt(i);

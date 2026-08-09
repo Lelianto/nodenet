@@ -1,3 +1,5 @@
+import { isRecord } from "../utils/validation.js";
+
 export type IdentityAssurance = "claimed" | "github-actions" | "github-user-token";
 
 export interface VerifiedIdentity {
@@ -25,7 +27,8 @@ export async function resolveGitHubIdentity(
     headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" },
   });
   if (!response.ok) throw new Error(`Cannot verify GitHub identity (HTTP ${response.status}).`);
-  const user = await response.json() as Record<string, unknown>;
+  const user: unknown = await response.json();
+  if (!isRecord(user)) throw new Error("GitHub identity response must be an object.");
   if (typeof user["id"] !== "number" || typeof user["login"] !== "string") throw new Error("GitHub identity response is incomplete.");
   return { provider: "github", providerUserId: user["id"], login: user["login"], assurance: "github-user-token", verifiedAt: new Date().toISOString() };
 }

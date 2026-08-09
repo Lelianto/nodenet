@@ -67,11 +67,12 @@ export * from "./authority/authority.js";
 export { loadConfig, defaultConfig } from "./config/config.js";
 export type { NodeNetConfig, LoadedConfig, Suppression } from "./config/config.js";
 
-export { saveGraph, loadGraph, appendAudit, loadSuppressions, dotNodenetDir } from "./storage/storage.js";
-export type { AuditEntry } from "./storage/storage.js";
+export { saveGraph, loadGraph, appendAudit, verifyAuditChain, loadSuppressions, dotNodenetDir } from "./storage/storage.js";
+export type { AuditEntry, AuditChainVerification } from "./storage/storage.js";
 
 export { renderGraphHtml } from "./visualization/html.js";
-export { startMcpHttpServer, type McpHttpOptions, type McpHttpServer } from "./mcp/http.js";
+export { startMcpHttpServer, type McpHttpOptions, type McpHttpServer, type McpHttpCredential } from "./mcp/http.js";
+export { McpSnapshotStore, type McpSnapshot } from "./mcp/snapshot.js";
 export { installAgentGuidance, uninstallAgentGuidance, AGENT_PLATFORMS, type AgentPlatform } from "./integration/installer.js";
 export { analyzeChangeCollisions, type CollisionReport, type ChangeCollision, type ChangeSetSummary } from "./change/collisions.js";
 export { registerLanguageAdapter, registeredLanguageAdapters, languageSupportMatrix, type LanguageAdapter, type LanguageSupportTier, type LanguageCapability } from "./parser/registry.js";
@@ -150,8 +151,8 @@ export {
 } from "./github/client.js";
 export type { GitHubClientConfig, GitHubComment, GitHubReviewRequest, GitHubCheckRun } from "./github/client.js";
 
-export { handleMcpLine, prepareMcpContext, MCP_PROTOCOL_VERSION } from "./mcp/server.js";
-export type { McpContext, McpTool } from "./mcp/server.js";
+export { handleMcpLine, prepareMcpContext, MCP_PROTOCOL_VERSION, MCP_SCOPES } from "./mcp/server.js";
+export type { McpContext, McpTool, McpScope, McpAuthorization } from "./mcp/server.js";
 
 export type { AnalysisState } from "./types/analysis-state.js";
 

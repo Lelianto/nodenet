@@ -7,24 +7,23 @@ never physically separated.
 
 ## Data flow
 
+```mermaid
+flowchart TD
+    repository["Repository"] -->|"nodenet build"| scanner["Bounded repository scanner"]
+    scanner --> parser["Language adapters"]
+    scanner --> artifacts["ADR, OpenAPI, SQL, and Terraform ingestion"]
+    parser --> codeGraph["Two-phase code graph builder"]
+    artifacts --> codeGraph
+    codeGraph --> unified["Unified graph"]
+    governance["Living context, ownership, and authority"] --> attach["Governance-layer attachment"]
+    unified --> attach
+    attach --> persisted["Validated graph, fingerprint index, and symbol cache"]
 ```
-repository
-   │  nodenet build
-   ▼
-scanRepository ──► parseSourceFile (TS Compiler API, per-file, deterministic)
-   │                  │
-   │                  ▼
-   │         buildCodeGraph   ──► Graph (nodes + edges, two-phase: all nodes,
-   │                                  then all edges — cross-file edges never
-   │                                  dropped for forward references)
-   │                  │
-   ▼                  ▼
-attachGovernanceLayers ──► merges ContextNode / TeamNode / DeveloperNode and
-                           governed_by, applies_to, owned_by, approved_by edges
-   │
-   ▼
-saveGraph (.nodenet/graph.json) + index.json (fingerprints) + symbols.json
-```
+
+The two-phase graph builder creates all nodes before edges, so forward
+references across files are retained. Governance attachment then adds context
+and actor nodes plus `governed_by`, `applies_to`, `owned_by`, and `approved_by`
+relationships before persistence.
 
 Analysis commands (`impact`, `reviewers`, `health`, `query`, ...) load the stored
 graph (runtime-validated), rebuild the light index from it, and reload living
@@ -39,10 +38,9 @@ context + ownership from disk.
 | `src/security/` | `SafeRelativePath`, resource limits, secret detection |
 | `src/config/` | Valibot-validated `nodenet.config.json` |
 | `src/scanner/` | Iterative repo walk, ignore patterns, symlink defense |
-| `src/parser/` | TypeScript Compiler API → symbols, imports/exports, references, JSX |
-| `src/analyzer/` | Code graph builder + governance layer merger |
+| `src/parser/` | Tiered language adapters, parser registry, parse cache, and normalized symbols/imports/references |
+| `src/analyzer/` | Code-graph construction, governance attachment, and deterministic ADR/OpenAPI/SQL/Terraform ingestion |
 | `src/context/` | Canonical LCDD 0.6 Registry adapter, legacy migration, lifecycle and provenance |
-| `src/parser/` | Tiered local language registry: full TypeScript, JavaScript, Python, Go, Java, C#, PHP; basic Rust, Ruby, Kotlin |
 | `src/ownership/` | Source-ranked ownership resolution, CODEOWNERS, git-history suggestions |
 | `src/authority/` | Authority levels + LCDD governance classification mapping |
 | `src/change/` | Git diff (arg arrays only), unified-diff parsing, symbol-level diff, impact |
@@ -53,7 +51,11 @@ context + ownership from disk.
 | `src/storage/` | `.nodenet/` persistence, fingerprint index, symbol cache, audit log |
 | `src/visualization/` | Self-contained governance map: community layout, semantic shapes, authority rings, change-decision overlay, evidence inspector |
 | `src/github/` | GitHub REST client (global fetch), PR comment builder, PR integration (`github pr`) |
-| `src/mcp/` | Dependency-free MCP over stdio or loopback-first HTTP for shared local agent access |
+| `src/mcp/` | MCP stdio plus experimental HTTP controls: scoped access, rate limits, immutable snapshots, cancellable workers, output security/contracts |
+| `src/governance/` | Stable governance decisions, audit events, quality gates, and emergency overrides |
+| `src/identity/` | Actor identity, role bindings, repository/context scope, and signed override verification |
+| `src/evaluation/` | Historical GitHub import, isolated replay, blind labeling, and decision-quality reports |
+| `src/onboarding/` | Safe bootstrap and repository-readiness checks |
 | `src/cli/` | All commands (spec §54) |
 
 ## Key design decisions
@@ -73,6 +75,10 @@ context + ownership from disk.
    (Valibot) at every external boundary; resource limits fail safely.
 6. **One package.** NodeNet is a single package until real boundaries justify
    splitting (`@nodenet/core`, `@nodenet/github`, ...) — spec §67.
+7. **Local HTTP is an explicit experimental boundary.** The HTTP bridge is not
+   MCP Streamable HTTP. It defaults to loopback and adds scoped authorization,
+   rate limiting, atomic snapshot reload, cancellable execution, and bounded
+   output around the same deterministic tool handlers used by stdio.
 
 ## Consistency guarantees
 

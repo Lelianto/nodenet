@@ -1,56 +1,118 @@
-# NodeNet Security
+# NodeNet Security Policy
 
-NodeNet treats **everything from the repository as untrusted input** (spec §38):
-source code, comments, configuration, git data, PR content.
+NodeNet treats repository content and integration input as untrusted. This
+document explains the supported release line, how to report a vulnerability,
+and the security boundaries contributors and operators should preserve.
 
-## Guarantees
+## Supported versions
 
-- **No code execution.** NodeNet never executes repository code, scripts,
-  config files, or shell commands from repository content (spec §21, §43).
-  Configuration is `nodenet.config.json` (data), never `.js`.
-- **No shell interpolation.** Git is invoked with argument arrays
-  (`spawn("git", [args...])`); refs are validated against
-  `/^[A-Za-z0-9][A-Za-z0-9._\-\/]*$/` and may not contain `..` (spec §42).
-- **Path containment.** All repository reads go through `SafeRelativePath` +
-  `resolveSafe`, which re-checks containment *after* realpath resolution so
-  symlinks cannot escape the repository root (spec §39).
-- **Resource limits.** Configurable max file size, file count, AST nodes, graph
-  nodes/edges, traversal depth/nodes, query results, context output. Violations
-  fail safely with warnings or typed errors — never unbounded memory (spec §40).
-- **Secret protection.** Secret-like paths (`.env*`, `*.pem`, `*.key`,
-  `credentials.*`, `secrets.*`, ...) are never scanned; generated AI context is
-  scanned for secret patterns before output (spec §45).
-- **No prompt-injection execution.** Source comments are evidence, never
-  instructions. AI context output marks sections by source and authority
-  (spec §46, §47).
-- **Least-privilege GitHub integration** (`nodenet github pr`). Requests only
-  the permissions it needs: `contents: read`, `pull-requests: write` (spec
-  §56). Auth comes from `GITHUB_TOKEN` / `--token`; the token is never
-  logged, and requests go to the REST API with JSON bodies only — never
-  shell-concatenated. Review requests include *declared* reviewers only
-  (required + authority-required); git-history suggestions are never sent
-  automatically (spec §57).
+Security fixes are applied to the latest published release. Older releases may
+not receive backports. Before reporting or reproducing an issue, verify it
+against the latest version when doing so is safe.
+
+| Version | Supported |
+| --- | --- |
+| Latest published release | Yes |
+| Older releases | No guaranteed fixes |
+| Unreleased `main` branch | Best effort; not a stable release |
+
+## Reporting a vulnerability
+
+Do not open a public issue, discussion, or pull request for a suspected
+vulnerability. Use GitHub's private vulnerability-reporting flow:
+
+[Report a vulnerability privately](https://github.com/Lelianto/nodenet/security/advisories/new)
+
+Include enough information to reproduce and assess the issue without exposing
+unrelated sensitive data:
+
+- affected NodeNet version or commit;
+- operating system and Node.js version;
+- affected command, API, MCP transport, or integration;
+- minimal reproduction steps or a small sanitized fixture;
+- expected and observed behavior;
+- security impact and required attacker capabilities;
+- any known workaround.
+
+Do not include real credentials, proprietary source code, customer data, or a
+live exploit against systems you do not own. If the private reporting form is
+unavailable, open a public issue containing no vulnerability details and ask a
+maintainer for a private contact channel.
+
+Maintainers will acknowledge the report, investigate impact, coordinate a fix
+and disclosure when warranted, and credit reporters who want attribution.
+Please allow a reasonable remediation window before public disclosure.
+
+## Security boundaries and controls
+
+- **No repository-code execution.** Analysis parses repository content; it does
+  not execute repository source, scripts, or JavaScript configuration. NodeNet
+  configuration is JSON data and is runtime-validated.
+- **No shell interpolation.** Git and other child processes are invoked with
+  argument arrays. Git refs are validated before use.
+- **Path containment.** Repository reads use safe relative paths and re-check
+  containment after realpath resolution so symlinks cannot escape the root.
+- **Bounded work.** File, AST, graph, traversal, query, request-body, and output
+  limits prevent unbounded processing. Violations fail safely with warnings or
+  typed errors.
+- **Secret protection.** Secret-like files are excluded from scanning and AI
+  context output is checked for common secret patterns. Audit records exclude
+  source contents and credentials.
+- **Prompt-injection resistance.** Source comments and documentation are
+  evidence, never executable instructions. Generated context retains source
+  and authority provenance.
+- **Runtime validation.** Configuration, persisted snapshots, MCP arguments,
+  remote responses, and other external data are validated at their trust
+  boundaries.
+- **Scoped shared access.** The experimental HTTP JSON-RPC bridge defaults to
+  loopback, supports bearer authentication and per-token scopes, applies rate
+  limits, uses immutable state snapshots, and records security-relevant audit
+  events. It is not an internet-facing hosted service or MCP Streamable HTTP
+  implementation.
+- **Least-privilege GitHub access.** Read-only analysis does not require a
+  token. Check Runs, comments, and reviewer requests require only the relevant
+  repository permissions; tokens are not logged. Git-history suggestions are
+  never requested as reviewers automatically.
+
+These controls reduce risk but are not a guarantee that NodeNet is free of
+vulnerabilities. Operators remain responsible for access control, host
+security, dependency updates, token scope, and safe CI configuration.
+
+## Deployment guidance
+
+- Prefer the stdio MCP server (`nodenet mcp`) for a single local client.
+- Keep `nodenet serve` bound to loopback. If remote access is unavoidable, put
+  it behind an authenticated, TLS-terminating proxy and use a dedicated,
+  least-privilege token with only the required scopes.
+- Do not expose generated `.nodenet/` state, audit logs, evaluation datasets,
+  or graph views publicly without reviewing them for repository metadata.
+- In CI, pin trusted workflow actions, grant the minimum GitHub permissions,
+  and do not run pull-request-controlled scripts with privileged secrets.
+- Run `nodenet audit-verify` before relying on the local audit chain. The chain
+  is tamper-evident, not an externally anchored or immutable ledger.
+
+Operational details for the shared bridge are in
+[docs/mcp-operations.md](docs/mcp-operations.md).
 
 ## Plugin policy
 
-Plugins (when introduced) are **trusted dependencies** that receive local code
-execution privileges. NodeNet will never auto-load plugins discovered inside
-arbitrary repositories. This is documented prominently (spec §44).
+Plugins are trusted dependencies with local code-execution privileges. NodeNet
+does not auto-load plugins discovered inside arbitrary repositories. Review and
+pin any plugin before granting it repository or credential access.
 
-## Audit
+## Scope notes
 
-Governance actions (context transitions, proposals, ownership changes, review
-requests, conflict detection) are appended to `.nodenet/audit.jsonl`. The audit
-never logs secrets, tokens, credentials, or full source files (spec §48).
+The full threat model, including assumptions and out-of-scope risks, lives in
+[docs/security/threat-model.md](docs/security/threat-model.md). In particular,
+local JSON state is validated but not encrypted, and a process that already
+controls the host or NodeNet installation is outside the repository-input
+threat boundary.
 
-## Reporting
+## Related documentation
 
-See `docs/security/threat-model.md` for the full threat model. For security
-issues, open a GitHub issue with the `security` label.
-
-## Related docs
-
-- [docs/security/threat-model.md](docs/security/threat-model.md) — full threat matrix
-- [docs/adr/002-runtime-validation.md](docs/adr/002-runtime-validation.md) — why
-  all external input is runtime-validated
-- [docs/](docs/) — documentation index
+- [Threat model](docs/security/threat-model.md)
+- [Runtime-validation ADR](docs/adr/002-runtime-validation.md)
+- [MCP design ADR](docs/adr/005-mcp-server.md)
+- [MCP operations](docs/mcp-operations.md)
+- [Verified overrides](docs/verified-overrides.md)
+- [Contributing guide](CONTRIBUTING.md)

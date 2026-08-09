@@ -17,7 +17,8 @@ import type { Result } from "../types/result.js";
 import { ok, err, errorMessage } from "../types/result.js";
 import type { Limits } from "../security/limits.js";
 
-export type Language = "typescript" | "tsx" | "javascript" | "jsx" | "python" | "go" | "java" | "rust" | "csharp" | "php" | "ruby" | "kotlin";
+export const LANGUAGES = ["typescript", "tsx", "javascript", "jsx", "python", "go", "java", "rust", "csharp", "php", "ruby", "kotlin"] as const;
+export type Language = (typeof LANGUAGES)[number];
 
 export type ParsedSymbolKind =
   | "function"

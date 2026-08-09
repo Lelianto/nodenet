@@ -55,11 +55,24 @@ analysis — nothing about the graph model or governance changes.
 
 The HTTP command remains an experimental JSON-RPC bridge, not MCP Streamable
 HTTP. It defaults to loopback, requires authentication for remote binding, and
-validates Origin, Content-Type, and Accept headers.
+validates Origin, Content-Type, and Accept headers. Bearer credentials can be
+restricted to `graph:read`, `context:read`, `impact:read`, `governance:read`,
+and `health:read`; lifecycle state is isolated per credential. `query` and
+`related` provide bounded cursor pagination with explicit selected, omitted,
+and next-cursor metadata.
+
+Shared-service hardening adds a per-credential token bucket, an immutable
+snapshot store that atomically replaces config and analysis state, and
+terminable worker execution for built-in tool calls in compiled distributions.
+Every built-in tool advertises and runtime-validates a versioned output schema.
+Security audit records are hash chained and can be checked with
+`nodenet audit-verify`. Operational details and safe defaults are documented in
+[MCP operations](../mcp-operations.md).
 
 ## Consequences
 
-- Only the stdio transport is provided today; HTTP is a future addition.
+- Stdio is the conforming local transport. The HTTP surface is deliberately
+  labeled an experimental JSON-RPC bridge until Streamable HTTP is implemented.
 - New tools are added as entries in `src/mcp/server.ts` with a Valibot schema.
 - Protocol version negotiation follows the MCP spec; updates are manual but
   small.

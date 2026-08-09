@@ -74,12 +74,12 @@ export function buildOwnershipIndex(
         for (const entry of raw) {
           if (typeof entry !== "object" || entry === null) continue;
           const e = entry as Record<string, unknown>;
-          if (typeof e.pattern === "string" && typeof e.owner === "string") {
+          if (typeof e["pattern"] === "string" && typeof e["owner"] === "string") {
             records.push({
-              pattern: e.pattern,
-              owner: e.owner,
-              source: (e.source as OwnershipSource) ?? "nodenet",
-              confidence: (e.confidence as OwnershipConfidence) ?? "DECLARED",
+              pattern: e["pattern"],
+              owner: e["owner"],
+              source: (e["source"] as OwnershipSource) ?? "nodenet",
+              confidence: (e["confidence"] as OwnershipConfidence) ?? "DECLARED",
             });
           }
         }
@@ -97,6 +97,12 @@ export function buildOwnershipIndex(
     }
   }
 
+  return ownershipIndexFromRecords(records);
+}
+
+/** Rehydrate an immutable ownership index from validated/plain records. */
+export function ownershipIndexFromRecords(recordsInput: OwnershipRecord[]): OwnershipIndex {
+  const records = recordsInput.map((record) => ({ ...record }));
   return {
     records,
     resolveOwner(relPath) {

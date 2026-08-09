@@ -39,9 +39,13 @@ import { safeRelativePath, type SafeRelativePath } from "../security/filesystem.
 import { evidenceClassForSource } from "../graph/edges.js";
 import { captureFreshnessBaseline, secureToolOutput, staleInputs, type FreshnessFingerprint } from "./security.js";
 import { appendAudit } from "../storage/storage.js";
+import path from "node:path";
+import { McpSnapshotStore } from "./snapshot.js";
 
 export const MCP_PROTOCOL_VERSION = "2024-11-05";
-export const MCP_SERVER_VERSION = "0.4.0";
+import { NODENET_VERSION } from "../version.js";
+
+export const MCP_SERVER_VERSION = NODENET_VERSION;
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -51,7 +55,17 @@ export interface McpTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  requiredScope: McpScope;
   run: (args: Record<string, unknown>, ctx: McpContext) => Result<string, string>;
+}
+
+export const MCP_SCOPES = ["graph:read", "context:read", "impact:read", "governance:read", "health:read"] as const;
+export type McpScope = (typeof MCP_SCOPES)[number];
+
+export interface McpAuthorization {
+  scopes: ReadonlySet<McpScope>;
+  repositoryRoot?: string;
 }
 
 export interface McpContext {
@@ -62,10 +76,13 @@ export interface McpContext {
   protocolState?: { initialized: boolean; ready: boolean; shutdownRequested: boolean };
   freshnessBaseline?: Map<string, FreshnessFingerprint>;
   auditEnabled?: boolean;
+  authorization?: McpAuthorization;
+  snapshotStore?: McpSnapshotStore;
 }
 
 /** Prepare transport-level immutable freshness state before serving requests. */
 export function prepareMcpContext(ctx: McpContext): McpContext {
+  ctx.snapshotStore ??= new McpSnapshotStore(ctx.config, ctx.state);
   ctx.freshnessBaseline ??= captureFreshnessBaseline(ctx);
   return ctx;
 }
@@ -86,6 +103,9 @@ const schema = (properties: Record<string, unknown>, required: string[]) => ({
   required,
   additionalProperties: false,
 });
+const objectOutput = (...required: string[]) => ({ type: "object", required, additionalProperties: true, "x-schemaVersion": "1" });
+const arrayOutput = () => ({ type: "array", "x-schemaVersion": "1" });
+const textOutput = () => ({ type: "string", "x-schemaVersion": "1" });
 
 function json(value: unknown): string {
   return JSON.stringify(value, null, 2);
@@ -215,17 +235,33 @@ function buildTools(ctx: McpContext): McpTool[] {
     {
       name: "query",
       description: "Search the repository graph for nodes by name (functions, files, classes, contexts).",
-      inputSchema: schema({ name: strField("Node name or fragment") }, ["name"]),
+      requiredScope: "graph:read",
+      outputSchema: objectOutput("pagination", "matches"),
+      inputSchema: schema({
+        name: strField("Node name or fragment"),
+        cursor: optIntField("Zero-based result offset", 0, 1_000_000, 0),
+        limit: optIntField("Maximum items in this page", 1, 200, 50),
+      }, ["name"]),
       run: (args) => {
         const name = String(args["name"] ?? "");
-        const matches = graph.queryByName(name).slice(0, 200).map(nodeRecord);
-        return ok(json({ matches }));
+        const cursor = typeof args["cursor"] === "number" ? args["cursor"] : 0;
+        const limit = typeof args["limit"] === "number" ? args["limit"] : 50;
+        const all = graph.queryByName(name);
+        const matches = all.slice(cursor, cursor + limit).map(nodeRecord);
+        const nextCursor = cursor + matches.length < all.length ? cursor + matches.length : null;
+        return ok(json({ pagination: { cursor, limit, selectedItems: matches.length, totalItems: all.length, omittedItems: Math.max(0, all.length - cursor - matches.length), nextCursor }, matches }));
       },
     },
     {
       name: "related",
       description: "Show nodes directly connected to a node, with edge relations.",
-      inputSchema: schema({ name: strField("Node name") }, ["name"]),
+      requiredScope: "graph:read",
+      outputSchema: objectOutput("node", "pagination", "related"),
+      inputSchema: schema({
+        name: strField("Node name"),
+        cursor: optIntField("Zero-based result offset", 0, 1_000_000, 0),
+        limit: optIntField("Maximum items in this page", 1, 200, 50),
+      }, ["name"]),
       run: (args) => {
         const name = String(args["name"] ?? "");
         const candidates = exactCandidates(graph, name);
@@ -233,16 +269,22 @@ function buildTools(ctx: McpContext): McpTool[] {
         if (ambiguous) return err(ambiguous);
         const node = candidates[0];
         if (!node) return err(`No node matching "${name}".`);
-        const related = neighbors(graph, node.id).map((r) => ({
+        const cursor = typeof args["cursor"] === "number" ? args["cursor"] : 0;
+        const limit = typeof args["limit"] === "number" ? args["limit"] : 50;
+        const all = neighbors(graph, node.id);
+        const related = all.slice(cursor, cursor + limit).map((r) => ({
           node: nodeRecord(r.node),
           edges: r.edges.map((e) => ({ relation: e.relation, source: e.provenance.source, evidence: e.provenance.classification ?? evidenceClassForSource(e.provenance.source) })),
         }));
-        return ok(json({ node: nodeRecord(node), related }));
+        const nextCursor = cursor + related.length < all.length ? cursor + related.length : null;
+        return ok(json({ node: nodeRecord(node), pagination: { cursor, limit, selectedItems: related.length, totalItems: all.length, omittedItems: Math.max(0, all.length - cursor - related.length), nextCursor }, related }));
       },
     },
     {
       name: "trace",
       description: "Find the shortest path between two nodes.",
+      requiredScope: "graph:read",
+      outputSchema: arrayOutput(),
       inputSchema: schema({ from: strField("Start node name"), to: strField("End node name") }, ["from", "to"]),
       run: (args) => {
         const fromName = String(args["from"] ?? "");
@@ -271,6 +313,8 @@ function buildTools(ctx: McpContext): McpTool[] {
       name: "context",
       description:
         "Build a Minimum Sufficient Context (MSC) bundle for a target: related code, living context, ownership, authority, change boundaries and AI guidance. Secret-scanned.",
+      requiredScope: "context:read",
+      outputSchema: objectOutput("target", "codeEvidence", "livingContext", "metrics"),
       inputSchema: schema({
         target: strField("Symbol name or file path"),
         maxTokens: optIntField(
@@ -296,12 +340,16 @@ function buildTools(ctx: McpContext): McpTool[] {
     {
       name: "explain",
       description: "Explain a node: what it is, what connects it, and the provenance of each connection.",
+      requiredScope: "graph:read",
+      outputSchema: textOutput(),
       inputSchema: schema({ name: strField("Node name") }, ["name"]),
       run: (args) => ok(describeNode(ctx, String(args["name"] ?? ""))),
     },
     {
       name: "governed_by",
       description: "Show living contexts governing a file or symbol.",
+      requiredScope: "context:read",
+      outputSchema: objectOutput("target", "contexts"),
       inputSchema: schema({ target: strField("File path or symbol name") }, ["target"]),
       run: (args) => {
         const target = String(args["target"] ?? "");
@@ -317,6 +365,8 @@ function buildTools(ctx: McpContext): McpTool[] {
     {
       name: "owner",
       description: "Show who owns a file or symbol (source + confidence).",
+      requiredScope: "context:read",
+      outputSchema: objectOutput("file", "owner", "confidence"),
       inputSchema: schema({ target: strField("File path or symbol name") }, ["target"]),
       run: (args) => {
         const target = String(args["target"] ?? "");
@@ -333,24 +383,32 @@ function buildTools(ctx: McpContext): McpTool[] {
     {
       name: "impact",
       description: "Analyze the current change (git diff) for impact: severity, affected code, living context, ownership boundaries.",
+      requiredScope: "impact:read",
+      outputSchema: objectOutput("severity", "changedFiles", "affectedFiles"),
       inputSchema: schema({ base: optStrField("Base git ref to compare against (e.g. main)") }, []),
       run: (args) => ok(describeImpact(ctx, typeof args["base"] === "string" ? args["base"] : undefined)),
     },
     {
       name: "reviewers",
       description: "Resolve reviewers for the current change: suggested, required, authorityRequired with reasons.",
+      requiredScope: "governance:read",
+      outputSchema: objectOutput("suggested", "required", "authorityRequired"),
       inputSchema: schema({ base: optStrField("Base git ref to compare against (e.g. main)") }, []),
       run: (args) => ok(describeReviewers(ctx, typeof args["base"] === "string" ? args["base"] : undefined)),
     },
     {
       name: "critical_review",
       description: "Critically review the current change and return an advisory decision, evidence-backed risks, required reviewers, mitigations, residual risk, and analysis limitations.",
+      requiredScope: "governance:read",
+      outputSchema: objectOutput("decision", "severity", "risks", "residualRisk"),
       inputSchema: schema({ base: optStrField("Base git ref to compare against (e.g. main)") }, []),
       run: (args) => ok(describeCriticalReview(ctx, typeof args["base"] === "string" ? args["base"] : undefined)),
     },
     {
       name: "health",
       description: "Report living context health: lifecycle coverage, conflicts, orphaned contexts.",
+      requiredScope: "health:read",
+      outputSchema: objectOutput("contexts"),
       inputSchema: schema({}, []),
       run: () => {
         const report = computeHealth(graph, contexts, ownership, ctx.config);
@@ -360,6 +418,8 @@ function buildTools(ctx: McpContext): McpTool[] {
     {
       name: "graph",
       description: "Repository graph summary: node and edge counts, node kinds, declared contexts.",
+      requiredScope: "graph:read",
+      outputSchema: objectOutput("nodes", "edges", "contexts", "kinds"),
       inputSchema: schema({}, []),
       run: () => {
         const kindCounts: Record<string, number> = {};
@@ -371,6 +431,8 @@ function buildTools(ctx: McpContext): McpTool[] {
       name: "report",
       description:
         "Deterministic highlights report: god nodes (highest-degree symbols), surprising cross-community connections, community summary, governance overview, and suggested questions the graph can answer.",
+      requiredScope: "graph:read",
+      outputSchema: textOutput(),
       inputSchema: schema({}, []),
       run: () => {
         const report = buildReport(graph, contexts, ownership, ctx.config);
@@ -404,6 +466,8 @@ function failure(id: number | string | null, code: number, message: string): str
  * to write to stdout, or null for notifications (no response required).
  */
 export function handleMcpLine(ctx: McpContext, line: string, tools?: McpTool[]): string | null {
+  const acquired = ctx.snapshotStore?.acquire();
+  const requestCtx = acquired ? { ...ctx, config: acquired.config, state: acquired.state } : ctx;
   let message: RpcMessage;
   try {
     const parsed = JSON.parse(line) as unknown;
@@ -423,12 +487,12 @@ export function handleMcpLine(ctx: McpContext, line: string, tools?: McpTool[]):
     return failure(id, -32600, "Invalid request: missing method.");
   }
   if (method.startsWith("notifications/")) {
-    if (method === "notifications/initialized" && ctx.protocolState?.initialized && !ctx.protocolState.shutdownRequested) {
-      ctx.protocolState.ready = true;
+    if (method === "notifications/initialized" && requestCtx.protocolState?.initialized && !requestCtx.protocolState.shutdownRequested) {
+      requestCtx.protocolState.ready = true;
     }
     return null;
   }
-  return handleMethod(ctx, id, method, message.params, tools ?? buildTools(ctx));
+  return handleMethod(requestCtx, id, method, message.params, tools ?? buildTools(requestCtx));
 }
 
 function handleMethod(
@@ -464,7 +528,7 @@ function handleMethod(
       if (ctx.protocolState?.shutdownRequested) return failure(id, -32000, "Server has shut down.");
       if (ctx.protocolState && !ctx.protocolState.ready) return failure(id, -32002, "Server initialization is not complete.");
       return success(id, {
-        tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
+        tools: tools.filter((tool) => isAuthorized(ctx, tool.requiredScope)).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, ...(t.outputSchema ? { outputSchema: t.outputSchema } : {}) })),
       });
     case "tools/call":
       if (ctx.protocolState?.shutdownRequested) return failure(id, -32000, "Server has shut down.");
@@ -490,6 +554,7 @@ function handleToolCall(ctx: McpContext, id: number | string | null, params: unk
   if (typeof name !== "string") return failure(id, -32602, "Invalid params: missing tool name.");
   const tool = tools.find((t) => t.name === name);
   if (!tool) return failure(id, -32602, `Unknown tool: ${name}`);
+  if (!isAuthorized(ctx, tool.requiredScope)) return failure(id, -32001, `Forbidden: missing scope ${tool.requiredScope}.`);
 
   if (args !== undefined && (typeof args !== "object" || args === null || Array.isArray(args))) {
     return failure(id, -32602, "Invalid params: tool arguments must be an object.");
@@ -509,6 +574,11 @@ function handleToolCall(ctx: McpContext, id: number | string | null, params: unk
   }
   if (result.ok) {
     try {
+      const outputValidation = validateOutput(tool, result.value);
+      if (!outputValidation.ok) {
+        auditTool(ctx, id, name, startedAt, "blocked", 0, false);
+        return toolResult(id, outputValidation.error, true);
+      }
       // `context` already applies a section-aware budget which deliberately
       // retains mandatory governance evidence even when that exceeds the soft
       // caller budget. Do not blindly truncate that evidence a second time.
@@ -519,6 +589,7 @@ function handleToolCall(ctx: McpContext, id: number | string | null, params: unk
         ...(requestedBudget !== undefined ? { budgetTokens: requestedBudget } : {}),
         secretPatterns: ctx.config.secretPatterns,
         failOnOverflow: name === "context",
+        toolName: name,
       });
       auditTool(ctx, id, name, startedAt, "success", secured.estimatedTokens, secured.truncated);
       return toolResult(id, secured.text, false, secured.structuredContent);
@@ -535,6 +606,32 @@ function handleToolCall(ctx: McpContext, id: number | string | null, params: unk
     auditTool(ctx, id, name, startedAt, "blocked", 0, false);
     return toolResult(id, "Tool error blocked by the secret-disclosure control.", true);
   }
+}
+
+function validateOutput(tool: McpTool, text: string): Result<void, string> {
+  const outputSchema = tool.outputSchema;
+  if (!outputSchema) return ok(undefined);
+  const type = outputSchema["type"];
+  if (type === "string") return typeof text === "string" ? ok(undefined) : err(`Output contract violation for ${tool.name}.`);
+  let parsed: unknown;
+  try { parsed = JSON.parse(text) as unknown; }
+  catch { return err(`Output contract violation for ${tool.name}: expected JSON ${String(type)}.`); }
+  if (type === "array") return Array.isArray(parsed) ? ok(undefined) : err(`Output contract violation for ${tool.name}: expected an array.`);
+  if (type === "object") {
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return err(`Output contract violation for ${tool.name}: expected an object.`);
+    const required = (outputSchema["required"] as string[] | undefined) ?? [];
+    const missing = required.filter((key) => !(key in (parsed as Record<string, unknown>)));
+    if (missing.length > 0) return err(`Output contract violation for ${tool.name}: missing ${missing.join(", ")}.`);
+    return ok(undefined);
+  }
+  return err(`Output contract violation for ${tool.name}: unsupported schema type.`);
+}
+
+function isAuthorized(ctx: McpContext, scope: McpScope): boolean {
+  const authorization = ctx.authorization;
+  if (!authorization) return true;
+  if (authorization.repositoryRoot && path.resolve(authorization.repositoryRoot) !== path.resolve(ctx.root)) return false;
+  return authorization.scopes.has(scope);
 }
 
 function auditTool(

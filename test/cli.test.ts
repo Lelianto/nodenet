@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { runCli } from "../src/cli/cli.js";
+import { appendAudit } from "../src/storage/storage.js";
 import { copyFixture, tmpDir, captureStdout } from "./helpers.js";
 
 const workDirs: string[] = [];
@@ -20,6 +21,14 @@ afterAll(() => {
 });
 
 describe("nodenet CLI", () => {
+  it("audit-verify reports a valid hash chain", async () => {
+    const repo = work("basic-typescript");
+    appendAudit(repo, { type: "test", at: "2026-01-01T00:00:00.000Z", outcome: "success" });
+    const { output, result } = captureStdout(() => runCli(["audit-verify", "--json"], { cwd: repo }));
+    expect(await result).toBe(0);
+    expect(JSON.parse(output)).toMatchObject({ valid: true, verifiedRecords: 1 });
+  });
+
   it("init creates config and .nodenet", async () => {
     const dir = tmpDir();
     workDirs.push(dir);

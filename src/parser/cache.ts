@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ParsedFile } from "./typescript.js";
+import { isRecord, readJsonFile } from "../utils/validation.js";
 
 export interface CachedParse {
   size: number;
@@ -14,9 +15,13 @@ export function loadParseCache(root: string): Map<string, CachedParse> {
   const file = path.join(root, ".nodenet", "parse-cache.json");
   if (!fs.existsSync(file)) return result;
   try {
-    const raw = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, CachedParse>;
+    const raw = readJsonFile(file);
+    if (!isRecord(raw)) return result;
     for (const [key, value] of Object.entries(raw)) {
-      if (value && typeof value.size === "number" && typeof value.mtimeMs === "number" && value.parsed && Array.isArray(value.parsed.symbols)) result.set(key, value);
+      if (!isRecord(value) || typeof value["size"] !== "number" || typeof value["mtimeMs"] !== "number") continue;
+      const parsed = value["parsed"];
+      if (!isRecord(parsed) || !Array.isArray(parsed["symbols"])) continue;
+      result.set(key, value as unknown as CachedParse);
     }
   } catch { /* corrupt cache causes deterministic reparse */ }
   return result;

@@ -2,7 +2,13 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import crypto from "node:crypto";
-import type { McpContext } from "./server.js";
+import path from "node:path";
+import type { AnalysisState } from "../types/analysis-state.js";
+import type { LoadedConfig } from "../config/config.js";
+import { captureFreshnessBaseline, staleInputs } from "./security.js";
+import { appendAudit } from "../storage/storage.js";
+import { executeMcpLineIsolated } from "./execution.js";
+import { MCP_SCOPES, type McpContext, type McpScope } from "./server.js";
 import { handleMcpLine } from "./server.js";
 import { prepareMcpContext } from "./server.js";
 
@@ -14,6 +20,18 @@ export interface McpHttpOptions {
   allowedOrigins?: string[];
   maxConcurrentRequests?: number;
   requestTimeoutMs?: number;
+  credentials?: McpHttpCredential[];
+  rateLimit?: { capacity: number; refillPerSecond: number };
+  reload?: {
+    intervalMs: number;
+    load: () => Promise<{ config: LoadedConfig; state: AnalysisState }>;
+  };
+}
+
+export interface McpHttpCredential {
+  token: string;
+  scopes: McpScope[];
+  repositoryRoot?: string;
 }
 
 export interface McpHttpServer {
@@ -22,6 +40,8 @@ export interface McpHttpServer {
   close(): Promise<void>;
 }
 
+interface TokenBucket { tokens: number; updatedAt: number }
+
 export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOptions = {}): Promise<McpHttpServer> {
   prepareMcpContext(ctx);
   const host = options.host ?? "127.0.0.1";
@@ -29,21 +49,85 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
   const maxBodyBytes = options.maxBodyBytes ?? 1_000_000;
   const maxConcurrentRequests = options.maxConcurrentRequests ?? 8;
   const requestTimeoutMs = options.requestTimeoutMs ?? 10_000;
+  const rateCapacity = options.rateLimit?.capacity ?? 60;
+  const rateRefillPerSecond = options.rateLimit?.refillPerSecond ?? 10;
   if (!Number.isInteger(maxBodyBytes) || maxBodyBytes < 1) throw new Error("maxBodyBytes must be a positive integer.");
   if (!Number.isInteger(maxConcurrentRequests) || maxConcurrentRequests < 1) throw new Error("maxConcurrentRequests must be a positive integer.");
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1) throw new Error("requestTimeoutMs must be a positive integer.");
+  if (!Number.isInteger(rateCapacity) || rateCapacity < 1 || !Number.isFinite(rateRefillPerSecond) || rateRefillPerSecond <= 0) {
+    throw new Error("rateLimit requires a positive integer capacity and positive refillPerSecond.");
+  }
+  if (options.reload && (!Number.isInteger(options.reload.intervalMs) || options.reload.intervalMs < 250)) {
+    throw new Error("reload.intervalMs must be an integer of at least 250ms.");
+  }
   let activeRequests = 0;
   const loopback = host === "127.0.0.1" || host === "::1" || host === "localhost";
-  if (!loopback && !options.token) throw new Error("A bearer token is required for non-loopback MCP HTTP binding.");
+  if (options.token && (options.credentials?.length ?? 0) > 0) throw new Error("Configure token or credentials, not both.");
+  if (!loopback && !options.token && (options.credentials?.length ?? 0) === 0) throw new Error("A bearer token is required for non-loopback MCP HTTP binding.");
+  const credentialHashes = new Set<string>();
+  for (const credential of options.credentials ?? []) {
+    if (credential.token.length < 8) throw new Error("Credential tokens must contain at least 8 characters.");
+    if (credential.scopes.length === 0 || credential.scopes.some((scope) => !(MCP_SCOPES as readonly string[]).includes(scope))) {
+      throw new Error("Each credential requires at least one valid MCP scope.");
+    }
+    const tokenHash = crypto.createHash("sha256").update(credential.token).digest("hex");
+    if (credentialHashes.has(tokenHash)) throw new Error("Credential tokens must be unique.");
+    credentialHashes.add(tokenHash);
+  }
+  const sessions = new Map<string, NonNullable<McpContext["protocolState"]>>();
+  const buckets = new Map<string, TokenBucket>();
+  let reloadRunning = false;
+  const reloadTimer = options.reload ? setInterval(() => {
+    if (reloadRunning) return;
+    const snapshot = ctx.snapshotStore!.acquire();
+    const checkCtx: McpContext = { ...ctx, config: snapshot.config, state: snapshot.state };
+    if (staleInputs(checkCtx).length === 0) return;
+    reloadRunning = true;
+    void options.reload!.load()
+      .then((next) => {
+        const swapped = ctx.snapshotStore!.swap(next.config, next.state);
+        ctx.config = swapped.config;
+        ctx.state = swapped.state;
+        ctx.freshnessBaseline = captureFreshnessBaseline(ctx);
+        if (ctx.auditEnabled) appendAudit(ctx.root, { type: "mcp-snapshot-reload", at: new Date().toISOString(), outcome: "success", graphRevision: swapped.revision });
+      })
+      .catch(() => {
+        if (ctx.auditEnabled) appendAudit(ctx.root, { type: "mcp-snapshot-reload", at: new Date().toISOString(), outcome: "error", graphRevision: snapshot.revision });
+      })
+      .finally(() => { reloadRunning = false; });
+  }, options.reload.intervalMs) : undefined;
+  reloadTimer?.unref();
   const server = http.createServer((request, response) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Cache-Control", "no-store");
-    if (options.token && !safeEqual(request.headers.authorization, `Bearer ${options.token}`)) {
-      response.writeHead(401, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ error: "unauthorized" }));
+    const access = resolveAccess(request.headers.authorization, options, loopback, ctx.root);
+    if (!access.authenticated) {
+      const unauthenticatedRate = consumeToken(buckets, `unauth:${request.socket.remoteAddress ?? "unknown"}`, rateCapacity, rateRefillPerSecond);
+      response.setHeader("X-RateLimit-Limit", String(rateCapacity));
+      response.setHeader("X-RateLimit-Remaining", String(unauthenticatedRate.remaining));
+      if (!unauthenticatedRate.allowed) {
+        response.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(unauthenticatedRate.retryAfterSeconds) });
+        response.end(JSON.stringify({ error: "rate_limited" }));
+        return;
+      }
+      response.writeHead(access.forbidden ? 403 : 401, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: access.forbidden ? "repository_forbidden" : "unauthorized" }));
+      return;
+    }
+    const rate = consumeToken(buckets, access.sessionKey, rateCapacity, rateRefillPerSecond);
+    response.setHeader("X-RateLimit-Limit", String(rateCapacity));
+    response.setHeader("X-RateLimit-Remaining", String(rate.remaining));
+    if (!rate.allowed) {
+      response.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(rate.retryAfterSeconds) });
+      response.end(JSON.stringify({ error: "rate_limited" }));
       return;
     }
     if (request.method === "GET" && request.url === "/health") {
+      if (!access.scopes.has("health:read")) {
+        response.writeHead(403, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "missing_scope", requiredScope: "health:read" }));
+        return;
+      }
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ ok: true, graphRevision: ctx.state.graph.metadata.builtAt }));
       return;
@@ -106,10 +190,65 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
     });
     request.on("end", () => {
       if (tooLarge || settled) return;
-      const result = handleMcpLine(ctx, Buffer.concat(chunks).toString("utf8"));
-      response.writeHead(result === null ? 202 : 200, { "Content-Type": "application/json" });
-      response.end(result ?? "");
-      finish();
+      const sessionKey = access.sessionKey;
+      const protocolState = sessions.get(sessionKey) ?? { initialized: false, ready: false, shutdownRequested: false };
+      sessions.set(sessionKey, protocolState);
+      const requestCtx: McpContext = {
+        ...ctx,
+        protocolState,
+        authorization: {
+          scopes: access.scopes,
+          ...(access.repositoryRoot !== undefined ? { repositoryRoot: access.repositoryRoot } : {}),
+        },
+      };
+      const line = Buffer.concat(chunks).toString("utf8");
+      let method: unknown;
+      let toolName: string | undefined;
+      try {
+        const parsed = JSON.parse(line) as { method?: unknown; params?: { name?: unknown } };
+        method = parsed.method;
+        if (typeof parsed.params?.name === "string") toolName = parsed.params.name;
+      } catch { /* sync handler returns parse error */ }
+      const isolated = method === "tools/call" ? executeMcpLineIsolated(requestCtx, line, requestTimeoutMs) : undefined;
+      if (!isolated) {
+        const result = handleMcpLine(requestCtx, line);
+        response.writeHead(result === null ? 202 : 200, { "Content-Type": "application/json" });
+        response.end(result ?? "");
+        finish();
+        return;
+      }
+      void isolated.then((execution) => {
+        if (settled) return;
+        if (ctx.auditEnabled) appendAudit(ctx.root, {
+          type: "mcp-worker-call",
+          at: new Date().toISOString(),
+          outcome: "success",
+          tool: toolName ?? "unknown",
+          clientId: access.sessionKey.slice(0, 16),
+          graphRevision: requestCtx.state.graph.metadata.builtAt,
+          isolated: execution.isolated,
+        });
+        response.setHeader("X-NodeNet-Execution", execution.isolated ? "worker" : "inline");
+        response.writeHead(execution.response === null ? 202 : 200, { "Content-Type": "application/json" });
+        response.end(execution.response ?? "");
+        finish();
+      }).catch((error: unknown) => {
+        if (settled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        const timedOut = /cancelled|exceeded/i.test(message);
+        if (ctx.auditEnabled) appendAudit(ctx.root, {
+          type: "mcp-worker-call",
+          at: new Date().toISOString(),
+          outcome: timedOut ? "cancelled" : "error",
+          tool: toolName ?? "unknown",
+          clientId: access.sessionKey.slice(0, 16),
+          graphRevision: requestCtx.state.graph.metadata.builtAt,
+          isolated: true,
+        });
+        response.writeHead(timedOut ? 504 : 500, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: timedOut ? "tool_execution_cancelled" : "tool_execution_failed" }));
+        finish();
+      });
     });
     request.on("error", () => {
       if (!response.headersSent) {
@@ -127,13 +266,63 @@ export async function startMcpHttpServer(ctx: McpContext, options: McpHttpOption
   return {
     server,
     url: `http://${host}:${address.port}`,
-    close: () => new Promise<void>((resolve, reject) => server.close((cause) => cause ? reject(cause) : resolve())),
+    close: () => {
+      if (reloadTimer) clearInterval(reloadTimer);
+      return new Promise<void>((resolve, reject) => server.close((cause) => cause ? reject(cause) : resolve()));
+    },
+  };
+}
+
+function consumeToken(
+  buckets: Map<string, TokenBucket>,
+  key: string,
+  capacity: number,
+  refillPerSecond: number,
+): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
+  const now = Date.now();
+  const bucket = buckets.get(key) ?? { tokens: capacity, updatedAt: now };
+  const elapsedSeconds = Math.max(0, now - bucket.updatedAt) / 1_000;
+  bucket.tokens = Math.min(capacity, bucket.tokens + elapsedSeconds * refillPerSecond);
+  bucket.updatedAt = now;
+  const allowed = bucket.tokens >= 1;
+  if (allowed) bucket.tokens -= 1;
+  buckets.set(key, bucket);
+  return {
+    allowed,
+    remaining: Math.floor(bucket.tokens),
+    retryAfterSeconds: allowed ? 0 : Math.max(1, Math.ceil((1 - bucket.tokens) / refillPerSecond)),
   };
 }
 
 function safeEqual(actual: string | undefined, expected: string): boolean {
   if (actual === undefined) return false;
-  const left = Buffer.from(actual);
-  const right = Buffer.from(expected);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
+  const left = crypto.createHash("sha256").update(actual).digest();
+  const right = crypto.createHash("sha256").update(expected).digest();
+  return crypto.timingSafeEqual(left, right);
+}
+
+type AccessResult =
+  | { authenticated: false; forbidden: boolean }
+  | { authenticated: true; scopes: ReadonlySet<McpScope>; repositoryRoot?: string; sessionKey: string };
+
+function resolveAccess(authorization: string | undefined, options: McpHttpOptions, loopback: boolean, expectedRoot: string): AccessResult {
+  if ((options.credentials?.length ?? 0) > 0) {
+    for (const credential of options.credentials ?? []) {
+      if (!safeEqual(authorization, `Bearer ${credential.token}`)) continue;
+      if (credential.repositoryRoot && path.resolve(credential.repositoryRoot) !== path.resolve(expectedRoot)) return { authenticated: false, forbidden: true };
+      return {
+        authenticated: true,
+        scopes: new Set(credential.scopes),
+        ...(credential.repositoryRoot !== undefined ? { repositoryRoot: credential.repositoryRoot } : {}),
+        sessionKey: crypto.createHash("sha256").update(credential.token).digest("hex"),
+      };
+    }
+    return { authenticated: false, forbidden: false };
+  }
+  if (options.token) {
+    if (!safeEqual(authorization, `Bearer ${options.token}`)) return { authenticated: false, forbidden: false };
+    return { authenticated: true, scopes: new Set(MCP_SCOPES), sessionKey: crypto.createHash("sha256").update(options.token).digest("hex") };
+  }
+  if (!loopback) return { authenticated: false, forbidden: false };
+  return { authenticated: true, scopes: new Set(MCP_SCOPES), sessionKey: "anonymous-loopback" };
 }

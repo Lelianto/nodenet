@@ -23,6 +23,7 @@ This directory is the hub for all NodeNet documentation. Start with the
 | 14 | Historical PR replay and Decision Lab | [evaluation.md](evaluation.md) |
 | 15 | Verified identity, RBAC, and signed overrides | [verified-overrides.md](verified-overrides.md) |
 | 16 | Token-efficient graph context and delivery plan | [token-efficient-context.md](token-efficient-context.md) |
+| 17 | Operating MCP scopes, limits, reload, workers, and audit | [mcp-operations.md](mcp-operations.md) |
 
 ## Concepts
 
@@ -54,6 +55,8 @@ Core mental model documents.
   actors, local RBAC policy, and signed override verification.
 - [token-efficient-context.md](token-efficient-context.md) — Graphify comparison,
   budgeted MSC design, evaluation gates, and delivery roadmap.
+- [mcp-operations.md](mcp-operations.md) — safe MCP deployment, scopes, rate
+  limiting, atomic reload, worker cancellation, schemas, and audit verification.
 
 ## Architecture decision records
 

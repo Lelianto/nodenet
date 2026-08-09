@@ -26,6 +26,7 @@ import {
   saveSymbolCache,
   loadSymbolCache,
   type CachedSymbol,
+  verifyAuditChain,
 } from "../storage/storage.js";
 import type { Graph } from "../graph/graph.js";
 import type { GraphNode } from "../graph/nodes.js";
@@ -46,7 +47,7 @@ import type { OwnershipIndex } from "../ownership/resolver.js";
 import type { ParsedSymbol, ParsedSymbolKind } from "../parser/typescript.js";
 import { runPrIntegration } from "../github/github.js";
 import { resolveGitHubToken, resolvePullNumber } from "../github/client.js";
-import { handleMcpLine, prepareMcpContext } from "../mcp/server.js";
+import { handleMcpLine, prepareMcpContext, MCP_SCOPES, type McpScope } from "../mcp/server.js";
 import { buildReport, renderReportMarkdown } from "../report/report.js";
 import type { AnalysisState } from "../types/analysis-state.js";
 import { buildGovernanceDecision, isGovernanceMode, type GovernanceMode } from "../governance/decision.js";
@@ -67,6 +68,7 @@ import { loadDataset, loadEvaluationRun, loadLabels, saveDataset, saveEvaluation
 import { replayDataset } from "../evaluation/replay.js";
 import { buildEvaluationReport, evaluationGate } from "../evaluation/report.js";
 import { startLabelServer } from "../evaluation/label-server.js";
+import { NODENET_VERSION } from "../version.js";
 
 // ---------------------------------------------------------------------------
 // Shared plumbing
@@ -316,7 +318,7 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
   program
     .name("nodenet")
     .description("NodeNet maps code, context, ownership, and authority into an explainable graph.")
-    .version("0.4.0");
+    .version(NODENET_VERSION);
 
   const withJson = (cmd: Command): Command => cmd.option("--json", "machine-readable JSON output");
 
@@ -1162,6 +1164,19 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       }
     });
 
+  program
+    .command("audit-verify")
+    .description("Verify the tamper-evident hash chain in .nodenet/audit.jsonl")
+    .option("--json", "emit machine-readable JSON")
+    .action((cmdOptions: { json?: boolean }) => {
+      const verification = verifyAuditChain(cwd);
+      if (cmdOptions.json) printJson(verification, true);
+      else process.stdout.write(verification.valid
+        ? `Audit chain valid: ${verification.verifiedRecords} verified record(s), ${verification.legacyRecords} legacy record(s).\n`
+        : `Audit chain INVALID at line ${verification.errorLine ?? "unknown"}: ${verification.message ?? "verification failed"}\n`);
+      if (!verification.valid) commandExitCode = 2;
+    });
+
   // -- serve ------------------------------------------------------------------
   program
     .command("serve")
@@ -1169,7 +1184,12 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     .option("--host <host>", "bind host; loopback is the safe default", "127.0.0.1")
     .option("--port <port>", "bind port", "7341")
     .option("--token <token>", "optional bearer token")
-    .action(async (cmdOptions: { host?: string; port?: string; token?: string }) => {
+    .option("--scopes <scopes>", "comma-separated token scopes (graph:read, context:read, impact:read, governance:read, health:read)")
+    .option("--rate-capacity <count>", "per-credential token-bucket capacity", "60")
+    .option("--rate-refill <count>", "tokens replenished per second", "10")
+    .option("--reload-interval <ms>", "stale-state check interval for atomic reload", "2000")
+    .option("--no-reload", "disable automatic atomic snapshot reload")
+    .action(async (cmdOptions: { host?: string; port?: string; token?: string; scopes?: string; rateCapacity?: string; rateRefill?: string; reloadInterval?: string; reload?: boolean }) => {
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config) as AnalysisState;
       const port = Number(cmdOptions.port ?? "7341");
@@ -1178,10 +1198,31 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       if (host !== "127.0.0.1" && host !== "::1" && !cmdOptions.token) {
         throw new Error("A bearer token is required when binding beyond loopback.");
       }
+      if (cmdOptions.scopes && !cmdOptions.token) throw new Error("--scopes requires --token.");
+      const scopes = (cmdOptions.scopes?.split(",").map((value) => value.trim()).filter(Boolean) ?? [...MCP_SCOPES]) as McpScope[];
+      if (scopes.length === 0 || scopes.some((scope) => !(MCP_SCOPES as readonly string[]).includes(scope))) {
+        throw new Error(`Invalid MCP scope. Valid scopes: ${MCP_SCOPES.join(", ")}.`);
+      }
+      const rateCapacity = Number(cmdOptions.rateCapacity ?? "60");
+      const rateRefillPerSecond = Number(cmdOptions.rateRefill ?? "10");
+      const reloadIntervalMs = Number(cmdOptions.reloadInterval ?? "2000");
+      if (!Number.isInteger(rateCapacity) || rateCapacity < 1) throw new Error("--rate-capacity must be a positive integer.");
+      if (!Number.isFinite(rateRefillPerSecond) || rateRefillPerSecond <= 0) throw new Error("--rate-refill must be positive.");
+      if (cmdOptions.reload !== false && (!Number.isInteger(reloadIntervalMs) || reloadIntervalMs < 250)) throw new Error("--reload-interval must be an integer of at least 250ms.");
       const server = await startMcpHttpServer({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true }, {
         host,
         port,
-        ...(cmdOptions.token ? { token: cmdOptions.token } : {}),
+        ...(cmdOptions.token ? { credentials: [{ token: cmdOptions.token, scopes, repositoryRoot: cwd }] } : {}),
+        rateLimit: { capacity: rateCapacity, refillPerSecond: rateRefillPerSecond },
+        ...(cmdOptions.reload !== false ? {
+          reload: {
+            intervalMs: reloadIntervalMs,
+            load: async () => {
+              const nextConfig = loadConfigChecked(cwd);
+              return { config: nextConfig, state: buildState(cwd, nextConfig) };
+            },
+          },
+        } : {}),
       });
       process.stdout.write(`EXPERIMENTAL NodeNet MCP JSON-RPC bridge listening at ${server.url}/mcp (not MCP Streamable HTTP)\n`);
       await new Promise<void>((resolve) => {

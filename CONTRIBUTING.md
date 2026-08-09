@@ -1,45 +1,138 @@
 # Contributing to NodeNet
 
-Thanks for contributing! NodeNet follows the principles of Living Context
-Driven Development: context is a first-class, versioned, governed artifact.
+Thank you for helping improve NodeNet. The project follows Living Context
+Driven Development: code, decisions, ownership, and governance should evolve
+together as reviewable, versioned artifacts.
 
-## Development
+By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Security vulnerabilities must be reported privately as described in
+[SECURITY.md](SECURITY.md), not in a public issue.
+
+## Before you start
+
+- Search existing [issues](https://github.com/Lelianto/nodenet/issues) and pull
+  requests before opening a duplicate.
+- For a focused bug fix or documentation correction, a pull request is welcome
+  directly.
+- For a large feature, public API change, new dependency, persistence-format
+  change, or architectural change, open an issue first so scope and trade-offs
+  can be agreed before implementation.
+- Keep pull requests focused. Unrelated refactors make governance and security
+  review harder.
+
+## Development setup
+
+Requirements: Node.js 20 or 22 and git.
 
 ```bash
-npm install
-npm run typecheck    # strict TS, noUncheckedIndexedAccess, exactOptionalPropertyTypes
-npm test             # vitest: unit, integration, security, property-based
-npm run build        # compile to dist/
+git clone https://github.com/Lelianto/nodenet.git
+cd nodenet
+npm ci
+npm run typecheck
+npm test
+npm run build
 ```
 
-## What counts as done
+Use `npm ci` for a reproducible checkout. If you intentionally change a
+dependency, use `npm install` and commit the resulting `package-lock.json`
+change with an explanation.
 
-Per spec §73, a feature is complete when: implementation exists, types are
-strict, runtime validation exists, security implications are considered, tests
-pass, documentation exists, error cases are handled, and output is explainable.
+Useful commands:
 
-No placeholders. No fake data. No fake benchmarks.
+| Command | Purpose |
+| --- | --- |
+| `npm run typecheck` | Check strict TypeScript types without emitting files |
+| `npm test` | Run the full Vitest suite once |
+| `npm run test:watch` | Run tests interactively while developing |
+| `npm run build` | Compile the package to `dist/` |
+| `npm run prepublishOnly` | Run the complete release verification sequence |
 
-## Conventions
+Generated output such as `dist/`, coverage data, and most `.nodenet/` runtime
+state is ignored and should not be committed unless a fixture or documented
+artifact explicitly requires it.
 
-- TypeScript strict mode; prefer `unknown` + narrowing over `any`.
-- Branded types for identifiers (`NodeId`, `ContextId`, `TeamId`, ...).
-- Discriminated unions for graph nodes; typed edges with runtime validation.
-- `Result<T, E>` for expected failures; explicit domain errors.
-- Exhaustive `switch` with `assertNever` on node kinds.
-- Tests for every fixture and security case (see `test/`).
+## Engineering conventions
 
-## Lifecycle of a change
+- Keep analysis deterministic: identical repository state and configuration
+  must produce identical decisions.
+- Treat repository files, configuration, persisted graph data, git metadata,
+  and remote API responses as untrusted input.
+- Use TypeScript strict mode. Prefer `unknown` plus validation or narrowing to
+  `any`.
+- Use branded identifiers (`NodeId`, `ContextId`, `TeamId`, and similar),
+  discriminated unions, and exhaustive switches for domain models.
+- Use `Result<T, E>` or explicit domain errors for expected failures. Avoid
+  silently swallowing invalid data.
+- Invoke external commands with argument arrays. Never interpolate repository
+  content into a shell command.
+- Preserve resource limits, path-containment checks, provenance, and
+  explainable output when adding a parser or integration.
+- Avoid new runtime dependencies unless the benefit and security/maintenance
+  cost are justified in the pull request.
 
-1. Write the failing test (fixtures live in `test/fixtures/`).
-2. Implement, keeping the graph deterministic and explainable.
-3. Add an ADR entry when you make an architectural decision.
-4. Run typecheck + full test suite.
-5. Update `CHANGELOG.md` and relevant docs.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries and
+[docs/security/threat-model.md](docs/security/threat-model.md) for the trust
+model.
+
+## Tests and fixtures
+
+Add or update tests for every behavioral change. Fixtures live under
+`test/fixtures/`; keep them minimal and describe the scenario through the test
+name and assertions.
+
+Changes at an external boundary should cover both valid and malformed input.
+Security-sensitive changes should include regression tests for containment,
+resource exhaustion, secret handling, authorization, or command injection as
+applicable. Parser changes should preserve the documented language capability
+contract in [docs/languages.md](docs/languages.md).
+
+Before submitting a pull request, run:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+```
+
+CI runs the same checks on Node.js 20 and 22.
+
+## Documentation and decisions
+
+Update documentation in the same pull request as behavior:
+
+- user-visible commands, flags, or workflows: `README.md` and relevant docs;
+- architecture or module boundaries: `ARCHITECTURE.md`;
+- notable user-visible changes: the `[Unreleased]` section of `CHANGELOG.md`;
+- security assumptions or controls: `SECURITY.md` and the threat model;
+- durable architectural decisions: a numbered ADR in `docs/adr/`.
+
+Add new documents to [docs/README.md](docs/README.md) so they remain
+discoverable. Do not include tokens, credentials, private evaluation data, or
+customer/repository source in issues, fixtures, logs, screenshots, or commits.
+
+## Pull requests
+
+A pull request should explain the problem, the chosen approach, tests run, and
+any compatibility, security, or governance impact. Link the related issue when
+one exists. Mark breaking changes clearly.
+
+A change is ready to merge when:
+
+- implementation and error handling are complete;
+- strict types and runtime validation cover relevant boundaries;
+- tests pass and include appropriate regression coverage;
+- output remains deterministic and explainable;
+- security and resource-limit implications have been considered;
+- documentation and the changelog are current;
+- no placeholders, fabricated data, or fake benchmarks remain.
+
+Maintainers may request changes, split an oversized pull request, or decline a
+proposal that conflicts with the project scope or security model.
 
 ## Where to look
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — how the modules fit together
-- [docs/](docs/) — concept docs, ADRs, threat model
-- Add new concept/ADR/security notes to `docs/` and link them from
-  [docs/README.md](docs/README.md).
+- [README.md](README.md) — product overview and CLI usage
+- [ARCHITECTURE.md](ARCHITECTURE.md) — data flow, modules, and invariants
+- [docs/README.md](docs/README.md) — concepts, ADRs, operations, and security
+- [SECURITY.md](SECURITY.md) — supported versions and private reporting
+- [CHANGELOG.md](CHANGELOG.md) — release history

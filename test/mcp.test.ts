@@ -3,6 +3,8 @@ import { handleMcpLine, MCP_PROTOCOL_VERSION, prepareMcpContext, type McpContext
 import { ok } from "../src/types/result.js";
 import { makeNodeId } from "../src/analyzer/code-graph.js";
 import { safeRelativePath } from "../src/security/filesystem.js";
+import { appendAudit, verifyAuditChain } from "../src/storage/storage.js";
+import { McpSnapshotStore } from "../src/mcp/snapshot.js";
 import { makeGitRepo, buildFixtureState, fixtureRoot, tmpDir, copyFixture } from "./helpers.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -57,6 +59,7 @@ describe("MCP server protocol", () => {
     expect(tools.map((t) => t.name)).toEqual(
       expect.arrayContaining(["query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "critical_review", "health", "graph", "report"]),
     );
+    expect(tools.every((tool) => (tool as { outputSchema?: unknown }).outputSchema !== undefined)).toBe(true);
   });
 
   it("rejects malformed JSON with a parse error", () => {
@@ -84,12 +87,14 @@ describe("MCP server protocol", () => {
     expect(arrayArgs?.error?.code).toBe(-32602);
     const extraParams = send(ctx, JSON.stringify({ jsonrpc: "2.0", id: 912, method: "tools/call", params: { name: "graph", arguments: {}, extra: true } }));
     expect(extraParams?.error?.code).toBe(-32602);
+    expect(call(ctx, 913, "query", { name: "Service", limit: 0 })?.result?.isError).toBe(true);
   });
 
   it("fails closed when any tool result contains a secret", () => {
     const tools: McpTool[] = [{
       name: "unsafe",
       description: "test",
+      requiredScope: "graph:read",
       inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
       run: () => ok("token=ghp_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ"),
     }];
@@ -100,11 +105,27 @@ describe("MCP server protocol", () => {
     expect(toolText(res)).not.toContain("ghp_");
   });
 
+  it("blocks successful tool output that violates its advertised schema", () => {
+    const invalid: McpTool = {
+      name: "invalid-output",
+      description: "test",
+      requiredScope: "graph:read",
+      inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
+      outputSchema: { type: "object", required: ["value"] },
+      run: () => ok("[]"),
+    };
+    const out = handleMcpLine(ctx, JSON.stringify({ jsonrpc: "2.0", id: 925, method: "tools/call", params: { name: invalid.name, arguments: {} } }), [invalid]);
+    const res = JSON.parse(out!) as ResponseLike;
+    expect(res.result?.isError).toBe(true);
+    expect(toolText(res)).toMatch(/output contract violation/i);
+  });
+
   it("applies configured secret patterns and structured evidence envelopes", () => {
     const customCtx: McpContext = { ...ctx, config: { ...ctx.config, secretPatterns: [...ctx.config.secretPatterns, "INTERNAL-[0-9]{4}"] } };
     const secretTool: McpTool = {
       name: "custom-secret",
       description: "test",
+      requiredScope: "graph:read",
       inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
       run: () => ok("INTERNAL-1234"),
     };
@@ -135,6 +156,43 @@ describe("MCP server protocol", () => {
     expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 919, method: "shutdown" }))?.error).toBeUndefined();
     expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 920, method: "tools/list" }))?.error?.code).toBe(-32000);
   });
+
+  it("filters tools and rejects calls outside the authorized scope and repository", () => {
+    const graphOnly: McpContext = { ...ctx, authorization: { scopes: new Set(["graph:read"]) } };
+    const listed = send(graphOnly, JSON.stringify({ jsonrpc: "2.0", id: 921, method: "tools/list" }));
+    const names = (listed?.result?.tools as { name: string }[]).map((tool) => tool.name);
+    expect(names).toContain("graph");
+    expect(names).not.toContain("context");
+    expect(call(graphOnly, 922, "graph")?.error).toBeUndefined();
+    expect(call(graphOnly, 923, "context", { target: "PaymentService" })?.error?.code).toBe(-32001);
+
+    const wrongRepository: McpContext = { ...graphOnly, authorization: { scopes: new Set(["graph:read"]), repositoryRoot: path.join(root, "other") } };
+    expect(call(wrongRepository, 924, "graph")?.error?.code).toBe(-32001);
+  });
+});
+
+describe("MCP snapshot and audit integrity", () => {
+  it("atomically swaps config and analysis state while acquired snapshots remain stable", () => {
+    const first = buildFixtureState(fixtureRoot("cross-team"));
+    const second = buildFixtureState(fixtureRoot("basic-typescript"));
+    const store = new McpSnapshotStore(first.config, first);
+    const acquired = store.acquire();
+    const swapped = store.swap(second.config, second);
+    expect(acquired.state.graph).toBe(first.graph);
+    expect(store.acquire()).toBe(swapped);
+    expect(store.acquire().state.graph).toBe(second.graph);
+    expect(acquired.state.graph).not.toBe(store.acquire().state.graph);
+  });
+
+  it("detects tampering in hash-chained audit records", () => {
+    const root = tmpDir();
+    appendAudit(root, { type: "first", at: "2026-01-01T00:00:00.000Z", outcome: "success" });
+    appendAudit(root, { type: "second", at: "2026-01-01T00:00:01.000Z", outcome: "success" });
+    expect(verifyAuditChain(root)).toMatchObject({ valid: true, verifiedRecords: 2 });
+    const file = path.join(root, ".nodenet/audit.jsonl");
+    fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace('"outcome":"success"', '"outcome":"failure"'));
+    expect(verifyAuditChain(root)).toMatchObject({ valid: false, errorLine: 1 });
+  });
 });
 
 describe("MCP tools", () => {
@@ -147,6 +205,23 @@ describe("MCP tools", () => {
     expect(res?.error).toBeUndefined();
     const body = JSON.parse(toolText(res!)) as { matches: { kind: string; path?: string }[] };
     expect(body.matches.some((m) => m.kind === "file" && m.path === "src/payment/PaymentService.ts")).toBe(true);
+  });
+
+  it("query and related expose deterministic cursor pagination metadata", () => {
+    const first = call(ctx, 101, "query", { name: "Service", limit: 1 });
+    const firstBody = JSON.parse(toolText(first!)) as { matches: { id: string }[]; pagination: { selectedItems: number; totalItems: number; omittedItems: number; nextCursor: number | null } };
+    expect(firstBody.pagination.selectedItems).toBe(1);
+    expect(firstBody.pagination.totalItems).toBeGreaterThan(1);
+    expect(firstBody.pagination.nextCursor).toBe(1);
+    const second = call(ctx, 102, "query", { name: "Service", cursor: firstBody.pagination.nextCursor!, limit: 1 });
+    const secondBody = JSON.parse(toolText(second!)) as typeof firstBody;
+    expect(secondBody.matches[0]?.id).not.toBe(firstBody.matches[0]?.id);
+
+    const related = call(ctx, 103, "related", { name: "createSettlement", limit: 1 });
+    const relatedBody = JSON.parse(toolText(related!)) as { related: unknown[]; pagination: { selectedItems: number; totalItems: number; omittedItems: number } };
+    expect(relatedBody.pagination.selectedItems).toBe(1);
+    expect(relatedBody.pagination.totalItems).toBeGreaterThanOrEqual(relatedBody.related.length);
+    expect(relatedBody.pagination.omittedItems).toBe(relatedBody.pagination.totalItems - 1);
   });
 
   it("related returns neighbors with relations", () => {

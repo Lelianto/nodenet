@@ -120,7 +120,10 @@ describe("renderGraphHtml", () => {
     expect(html).toContain('r.width/2+n.x*scale');
     expect(html).toContain('id="fit"');
     expect(html).toContain('id="view-toggle"');
-    expect(html).toContain('view3d=false');
+    expect(html).toContain('new URLSearchParams(location.search).get("view")');
+    expect(html).toContain('url.searchParams.set("view",view3d?"3d":"2d")');
+    expect(html).toContain('setViewMode(view3d?"3d":"2d",false)');
+    expect(html).toContain('view3d=initialView==="3d"');
     expect(html).toContain('n.gx*cy+n.gz*sy');
     expect(html).toContain('pitch=drag.pitch+dy*.006');
     expect(html).not.toContain('Math.max(-1.25');
@@ -158,6 +161,23 @@ describe("renderGraphHtml", () => {
     expect(html).toContain('data-scope="1"');
     expect(html).toContain('data-scope="2"');
     expect(html).toContain('id="minimap"');
+    expect(html).toContain('id="all-lines"');
+    expect(html).toContain('id="display-toggle"');
+    expect(html).toContain('id="display-panel" hidden');
+    expect(html).toContain('id="language-trigger"');
+    expect(html).toContain('id="language-menu" hidden');
+    expect(html).toContain('data-label-mode="important"');
+    expect(html).not.toContain("<select");
+    expect(html).toContain("document.body.appendChild(searchResults)");
+    expect(html).toContain("positionSearchResults()");
+    expect(html).toContain("document.body.appendChild(languageMenu)");
+    expect(html).toContain("positionLanguageMenu()");
+    expect(html).toContain('Peta Tata Kelola');
+    expect(html).toContain('applyLanguage("en")');
+    expect(html).toContain('id="camera-pad" aria-label="Camera controls" hidden');
+    expect(html.match(/if\(allLines\)return true/g)).toHaveLength(2);
+    expect(html).toContain('ctx.quadraticCurveTo');
+    expect(html).toContain('ctx.lineCap="round"');
     expect(html).toContain('kind:function');
     expect(html).toContain('prefers-reduced-motion');
     for (const axis of ["gx", "gy", "gz"] as const) {

@@ -19,6 +19,7 @@ export interface OutputSecurityOptions {
   secretPatterns?: string[];
   /** Mandatory governance must fail rather than be truncated out of view. */
   failOnOverflow?: boolean;
+  toolName?: string;
 }
 
 export function secureToolOutput(text: string, options: OutputSecurityOptions = {}): SecuredOutput {
@@ -37,7 +38,7 @@ export function secureToolOutput(text: string, options: OutputSecurityOptions = 
   } catch { /* compatibility text is not structured JSON */ }
   if (parsedValue === undefined) value = escapeUnicodeControls(text);
   const structuredContent = parsedValue !== undefined
-    ? evidenceEnvelope(parsedValue)
+    ? evidenceEnvelope(parsedValue, options.toolName)
     : undefined;
   if (estimatedTokens <= budgetTokens) {
     return { text: value, estimatedTokens, truncated: false, ...(structuredContent ? { structuredContent } : {}) };
@@ -57,7 +58,7 @@ export function secureToolOutput(text: string, options: OutputSecurityOptions = 
   };
   value = JSON.stringify(bounded, null, 2);
   if (hasSecret(value, options.secretPatterns)) throw new Error("Output blocked by the secret-disclosure control.");
-  return { text: value, structuredContent: evidenceEnvelope(bounded), estimatedTokens, truncated: true };
+  return { text: value, structuredContent: evidenceEnvelope(bounded, options.toolName), estimatedTokens, truncated: true };
 }
 
 const DANGEROUS_UNICODE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g;
@@ -79,9 +80,10 @@ function sanitizeValue(value: unknown): unknown {
   return value;
 }
 
-function evidenceEnvelope(data: unknown): Record<string, unknown> {
+function evidenceEnvelope(data: unknown, toolName: string | undefined): Record<string, unknown> {
   return {
     schemaVersion: "1",
+    ...(toolName !== undefined ? { tool: toolName } : {}),
     trust: "untrusted_repository_evidence",
     data,
   };

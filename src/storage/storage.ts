@@ -16,6 +16,8 @@ import { ALL_NODE_KINDS, type GraphNode } from "../graph/nodes.js";
 import { ALL_RELATIONS, EVIDENCE_CLASSES, evidenceClassForSource, type GraphEdge, type EdgeProvenance } from "../graph/edges.js";
 import type { Suppression } from "../config/config.js";
 import { matchGlob } from "../utils/glob.js";
+import crypto from "node:crypto";
+import { LANGUAGES, type Language } from "../parser/typescript.js";
 
 export const DOT_NODENET = ".nodenet";
 
@@ -119,8 +121,8 @@ function validateNode(raw: unknown): GraphNode | undefined {
   const base = { id: n["id"] as GraphNode["id"], name: n["name"] as string };
   switch (kind) {
     case "file": {
-      if (typeof n["path"] !== "string") return undefined;
-      return { ...base, kind, path: n["path"], language: (n["language"] as GraphNode & { language: string })?.language ?? "typescript", isTest: n["isTest"] === true } as GraphNode;
+      if (typeof n["path"] !== "string" || !isLanguage(n["language"]) || typeof n["isTest"] !== "boolean") return undefined;
+      return { ...base, kind, path: n["path"], language: n["language"], isTest: n["isTest"] } as GraphNode;
     }
     case "directory":
       return { ...base, kind, path: (n["path"] as string) ?? "" } as GraphNode;
@@ -186,6 +188,10 @@ function validateNode(raw: unknown): GraphNode | undefined {
     default:
       return undefined;
   }
+}
+
+function isLanguage(value: unknown): value is Language {
+  return typeof value === "string" && (LANGUAGES as readonly string[]).includes(value);
 }
 
 function validateEdge(raw: unknown): GraphEdge | undefined {
@@ -337,16 +343,73 @@ export interface AuditEntry {
   [key: string]: string | number | boolean;
 }
 
+export interface AuditChainVerification {
+  valid: boolean;
+  verifiedRecords: number;
+  legacyRecords: number;
+  errorLine?: number;
+  message?: string;
+}
+
 export function appendAudit(root: string, entry: AuditEntry): void {
   try {
     ensureDotNodenet(root);
+    const file = path.join(dotNodenetDir(root), "audit.jsonl");
+    const previousHash = lastAuditHash(file);
+    const payload = { ...entry, at: entry.at ?? new Date().toISOString(), previousHash };
+    const recordHash = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
     fs.appendFileSync(
-      path.join(dotNodenetDir(root), "audit.jsonl"),
-      JSON.stringify({ ...entry, at: entry.at ?? new Date().toISOString() }) + "\n",
+      file,
+      JSON.stringify({ ...payload, recordHash }) + "\n",
     );
   } catch {
     // audit failures are non-fatal
   }
+}
+
+function lastAuditHash(file: string): string {
+  if (!fs.existsSync(file)) return "GENESIS";
+  try {
+    const lines = fs.readFileSync(file, "utf8").trim().split("\n").filter(Boolean);
+    for (let index = lines.length - 1; index >= 0; index--) {
+      const parsed = JSON.parse(lines[index]!) as { recordHash?: unknown };
+      if (typeof parsed.recordHash === "string") return parsed.recordHash;
+    }
+    return "LEGACY";
+  } catch {
+    return "CORRUPT";
+  }
+}
+
+export function verifyAuditChain(root: string): AuditChainVerification {
+  const file = path.join(dotNodenetDir(root), "audit.jsonl");
+  if (!fs.existsSync(file)) return { valid: true, verifiedRecords: 0, legacyRecords: 0 };
+  const lines = fs.readFileSync(file, "utf8").split("\n").filter((line) => line.trim().length > 0);
+  let expectedPrevious = "GENESIS";
+  let verifiedRecords = 0;
+  let legacyRecords = 0;
+  let chainStarted = false;
+  for (let index = 0; index < lines.length; index++) {
+    let record: Record<string, unknown>;
+    try { record = JSON.parse(lines[index]!) as Record<string, unknown>; }
+    catch { return { valid: false, verifiedRecords, legacyRecords, errorLine: index + 1, message: "Invalid JSON audit record." }; }
+    if (typeof record["recordHash"] !== "string" || typeof record["previousHash"] !== "string") {
+      if (chainStarted) return { valid: false, verifiedRecords, legacyRecords, errorLine: index + 1, message: "Unsigned record after hash chain started." };
+      legacyRecords++;
+      expectedPrevious = "LEGACY";
+      continue;
+    }
+    chainStarted = true;
+    if (record["previousHash"] !== expectedPrevious) {
+      return { valid: false, verifiedRecords, legacyRecords, errorLine: index + 1, message: "Broken previousHash link." };
+    }
+    const { recordHash, ...payload } = record;
+    const computed = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+    if (recordHash !== computed) return { valid: false, verifiedRecords, legacyRecords, errorLine: index + 1, message: "Audit record hash mismatch." };
+    expectedPrevious = recordHash;
+    verifiedRecords++;
+  }
+  return { valid: true, verifiedRecords, legacyRecords };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 {
   "name": "@antihero/nodenet",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "NodeNet maps code, living context, ownership, and authority into an explainable graph — so humans and AI know what a change affects and who must review it. Deterministic, local-first, zero LLM/vector dependencies.",
   "keywords": [
     "graph",
@@ -69,14 +69,19 @@
     "docs/glossary.md",
     "docs/evaluation.md",
     "docs/verified-overrides.md",
+    "docs/mcp-operations.md",
     "docs/language-support.svg",
     "docs/how-it-works.svg"
   ],
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

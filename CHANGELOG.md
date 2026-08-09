@@ -4,7 +4,20 @@ All notable changes to NodeNet are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-09
+
+### Changed
+
+- Refreshed all root documentation, expanded contribution and private security
+  reporting guidance, clarified local-versus-networked security boundaries,
+  and added a project Code of Conduct.
+
 ### Added
+
+- MCP shared-service hardening: per-credential token-bucket rate limits,
+  repository-scoped authorization, immutable config+state snapshot reload,
+  terminable worker execution in compiled distributions, versioned output
+  contracts, and hash-chained audit records with `nodenet audit-verify`.
 
 - `nodenet open`: one-command loopback graph server with automatic browser
   launch, repository watching, SSE hot reload, safe error retention, and

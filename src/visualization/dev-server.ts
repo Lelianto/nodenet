@@ -54,22 +54,23 @@ export async function startGraphDevServer(options: GraphDevServerOptions): Promi
     }
   };
   const server = http.createServer((request, response) => {
+    const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:");
-    if (request.method === "GET" && request.url === "/") {
+    if (request.method === "GET" && pathname === "/") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(html);
       return;
     }
-    if (request.method === "GET" && request.url === "/__nodenet/events") {
+    if (request.method === "GET" && pathname === "/__nodenet/events") {
       response.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive" });
       response.write(`event: ready\ndata: ${JSON.stringify({ error: lastError })}\n\n`);
       clients.add(response);
       request.on("close", () => clients.delete(response));
       return;
     }
-    if (request.method === "GET" && request.url === "/__nodenet/health") {
+    if (request.method === "GET" && pathname === "/__nodenet/health") {
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ ok: lastError === undefined, error: lastError ?? null }));
       return;
