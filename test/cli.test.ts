@@ -65,6 +65,16 @@ describe("nodenet CLI", () => {
     expect(output).toContain("SEC-009");
   });
 
+  it("context applies the automatic token budget without user configuration", async () => {
+    const repo = work("cross-team");
+    expect(await runCli(["build"], { cwd: repo })).toBe(0);
+    const { output, result } = captureStdout(() => runCli(["context", "createSettlement", "--json"], { cwd: repo }));
+    expect(await result).toBe(0);
+    const bundle = JSON.parse(output) as { metrics: { budgetTokens: number; estimatedTokens: number } };
+    expect(bundle.metrics.budgetTokens).toBe(2000);
+    expect(bundle.metrics.estimatedTokens).toBeGreaterThan(0);
+  });
+
   it("context migrates legacy records to the LCDD 0.6 Registry", async () => {
     const repo = work("cross-team");
     const preview = await runCli(["context", "--migrate", "--json"], { cwd: repo });

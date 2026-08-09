@@ -20,7 +20,7 @@ runtime-validated with **Valibot** (consistent with
 
 Command: `nodenet mcp`. Tools: `query`, `related`, `trace`, `context` (MSC
 bundle), `explain`, `governed_by`, `owner`, `impact`, `reviewers`, `health`,
-`graph`.
+`critical_review`, `graph`.
 
 ## Rationale
 
@@ -41,9 +41,21 @@ analysis — nothing about the graph model or governance changes.
 
 - Tools never execute repository code; they query the persisted graph and
   run git with arg arrays only.
-- `context` runs the MSC builder, whose output is secret-scanned (spec §46).
+- Every successful result and error passes through a centralized,
+  fail-closed secret-disclosure control before leaving the server.
+- Governance-sensitive retrieval rejects stale repository inputs, and target
+  resolution returns all plausible candidates rather than selecting silently.
+- Potentially large results use a common 2,000-token default response budget;
+  truncation is explicit. The `context` builder retains mandatory governance
+  evidence through its section-aware budget.
+- Runtime validation enforces unknown-property rejection and advertised
+  integer ranges.
 - Tool errors are returned as MCP `isError` results — a failing tool never
   crashes the server.
+
+The HTTP command remains an experimental JSON-RPC bridge, not MCP Streamable
+HTTP. It defaults to loopback, requires authentication for remote binding, and
+validates Origin, Content-Type, and Accept headers.
 
 ## Consequences
 

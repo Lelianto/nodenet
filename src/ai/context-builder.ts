@@ -39,9 +39,24 @@ export interface BundleGuidance {
   why: string;
 }
 
+export interface BundleCodeEvidence {
+  id: string;
+  label: string;
+  path?: string;
+  relation: string;
+  direction: "outgoing" | "incoming";
+  provenance: string;
+  score: number;
+  depth: 1 | 2;
+  selectionReason: string;
+}
+
 export interface ContextBundle {
   target: string;
   codeContext: string[];
+  /** Structured, tainted repository evidence; codeContext remains for compatibility. */
+  codeEvidence: BundleCodeEvidence[];
+  recommendedFiles: string[];
   livingContext: BundleContextRef[];
   ownership: BundleOwner[];
   authority: { contextId: string; approvers: string[] }[];
@@ -49,7 +64,26 @@ export interface ContextBundle {
   aiGuidance: BundleGuidance[];
   /** Marks whether the bundle text contained secret-like values. */
   secretFlagged: boolean;
+  metrics: ContextBundleMetrics;
 }
+
+export interface ContextBundleMetrics {
+  /** Deterministic, model-neutral estimate (roughly four UTF-16 characters per token). */
+  estimatedTokens: number;
+  budgetTokens: number;
+  truncated: boolean;
+  selectedNodes: number;
+  omittedNodes: number;
+}
+
+export interface ContextBundleOptions {
+  /** Soft output budget. Required governance is never discarded to satisfy it. */
+  maxTokens?: number;
+}
+
+export const DEFAULT_CONTEXT_TOKEN_BUDGET = 2_000;
+export const MIN_CONTEXT_TOKEN_BUDGET = 256;
+export const MAX_CONTEXT_TOKEN_BUDGET = 32_000;
 
 /** Build an MSC bundle for a query or a specific symbol name. */
 export function buildContextBundle(
@@ -58,6 +92,7 @@ export function buildContextBundle(
   ownershipIndex: OwnershipIndex,
   contexts: ContextRecord[],
   query: string,
+  options: ContextBundleOptions = {},
 ): ContextBundle | null {
   void index;
   const target = findTarget(graph, query);
@@ -66,6 +101,7 @@ export function buildContextBundle(
   const targetNode = target.node;
   const targetFile = targetFileOf(targetNode);
   const related = findRelated(graph, targetNode);
+  const budgetTokens = normalizeTokenBudget(options.maxTokens);
 
   const livingContext = contexts.filter((ctx) =>
     targetFile !== undefined && ctx.appliesTo.some((pattern) => matchGlob(pattern, targetFile.toString())),
@@ -91,7 +127,9 @@ export function buildContextBundle(
 
   const bundle: ContextBundle = {
     target: nodeLabel(targetNode),
-    codeContext: related.map(nodeLabel),
+    codeContext: [],
+    codeEvidence: [],
+    recommendedFiles: [],
     livingContext: livingContext.map((c) => ({
       id: c.id,
       title: c.title,
@@ -104,9 +142,38 @@ export function buildContextBundle(
     changeBoundaries: [...changeBoundaries],
     aiGuidance,
     secretFlagged: false,
+    metrics: {
+      estimatedTokens: 0,
+      budgetTokens,
+      truncated: false,
+      selectedNodes: 0,
+      omittedNodes: 0,
+    },
   };
+  for (const candidate of related) {
+    const next = [...bundle.codeContext, nodeLabel(candidate.node)];
+    const evidence = evidenceFor(candidate);
+    const projected = { ...bundle, codeContext: next, codeEvidence: [...bundle.codeEvidence, evidence] };
+    if (estimateTokens(projected) > budgetTokens) continue;
+    bundle.codeContext = next;
+    bundle.codeEvidence.push(evidence);
+  }
+  bundle.recommendedFiles = [...new Set(bundle.codeEvidence.map((entry) => entry.path).filter((value): value is string => Boolean(value)))].slice(0, 20);
+  bundle.metrics.selectedNodes = bundle.codeContext.length;
+  bundle.metrics.omittedNodes = related.length - bundle.codeContext.length;
+  bundle.metrics.truncated = bundle.metrics.omittedNodes > 0;
+  bundle.metrics.estimatedTokens = estimateTokens(bundle);
   bundle.secretFlagged = containsSecrets(JSON.stringify(bundle));
   return bundle;
+}
+
+export function estimateTokens(value: unknown): number {
+  return Math.ceil(JSON.stringify(value).length / 4);
+}
+
+function normalizeTokenBudget(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return DEFAULT_CONTEXT_TOKEN_BUDGET;
+  return Math.min(MAX_CONTEXT_TOKEN_BUDGET, Math.max(MIN_CONTEXT_TOKEN_BUDGET, Math.floor(value)));
 }
 
 const CALLABLE_KINDS = new Set(["function", "method", "reactComponent", "reactHook"]);
@@ -122,6 +189,7 @@ function findTarget(
 
   let best: { node: GraphNode; score: number } | null = null;
   for (const node of graph.nodes()) {
+    if (node.id === query) return { node, score: Number.MAX_SAFE_INTEGER };
     if (node.kind === "repository" || node.kind === "workspace" || node.kind === "directory") continue;
     const name = node.name.toLowerCase();
     let score = 0;
@@ -173,44 +241,85 @@ function targetFileOf(node: GraphNode): SafeRelativePath | undefined {
   return undefined;
 }
 
-function findRelated(graph: Graph, node: GraphNode): GraphNode[] {
+interface RelatedCandidate {
+  node: GraphNode;
+  score: number;
+  relation: string;
+  direction: "outgoing" | "incoming";
+  provenance: string;
+  depth: 1 | 2;
+}
+
+const RELATION_WEIGHT: Record<string, number> = {
+  calls: 10,
+  tests: 10,
+  implements: 9,
+  extends: 9,
+  renders: 9,
+  references: 8,
+  uses: 8,
+  imports: 7,
+  exports: 6,
+  reexports: 6,
+  depends_on: 6,
+  configures: 6,
+  documents: 4,
+  defines: 4,
+};
+
+function findRelated(graph: Graph, node: GraphNode): RelatedCandidate[] {
   const seen = new Set<string>([node.id]);
-  const related: GraphNode[] = [];
-  for (const edge of graph.incident(node.id)) {
-    if (edge.relation === "contains") continue;
-    const otherId = edge.from === node.id ? edge.to : edge.from;
-    if (seen.has(otherId)) continue;
-    seen.add(otherId);
-    const other = graph.getNode(otherId);
-    // code context only: skip governance/actor nodes and containers
-    if (!other) continue;
-    switch (other.kind) {
-      case "repository":
-      case "workspace":
-      case "directory":
-      case "team":
-      case "developer":
-      case "role":
-      case "businessRule":
-      case "architectureDecision":
-      case "securityPolicy":
-      case "codingConvention":
-      case "requirement":
-      case "specification":
-      case "complianceRule":
-      case "operationalRule":
-      case "incidentLearning":
-      case "assumption":
-      case "domainRule":
-      case "externalConstraint":
-        continue;
-      default:
-        break;
+  const related: RelatedCandidate[] = [];
+  const queue: { id: GraphNode["id"]; depth: 0 | 1; inheritedScore: number }[] = [{ id: node.id, depth: 0, inheritedScore: 0 }];
+  while (queue.length > 0 && related.length < 400) {
+    const current = queue.shift()!;
+    for (const edge of graph.incident(current.id)) {
+      if (edge.relation === "contains") continue;
+      const direction = edge.from === current.id ? "outgoing" : "incoming";
+      const otherId = direction === "outgoing" ? edge.to : edge.from;
+      if (seen.has(otherId)) continue;
+      seen.add(otherId);
+      const other = graph.getNode(otherId);
+      if (!other || !isCodeEvidenceNode(other)) continue;
+      const depth = (current.depth + 1) as 1 | 2;
+      const evidenceBonus = edge.provenance.source === "ast" ? 3 : edge.provenance.source === "inferred" ? 0 : 1;
+      const symbolBonus = isCodeSymbol(other) ? 2 : other.kind === "test" ? 4 : 0;
+      const directionBonus = edge.relation === "tests" && direction === "incoming" ? 3
+        : edge.relation === "calls" && direction === "outgoing" ? 2
+          : 0;
+      const depthPenalty = depth === 2 ? 4 : 0;
+      const score = (RELATION_WEIGHT[edge.relation] ?? 2) + evidenceBonus + symbolBonus + directionBonus - depthPenalty + Math.floor(current.inheritedScore / 4);
+      related.push({ node: other, score, relation: edge.relation, direction, provenance: edge.provenance.source, depth });
+      if (depth < 2) queue.push({ id: other.id, depth: 1, inheritedScore: score });
     }
-    related.push(other);
-    if (related.length >= 15) break;
   }
-  return related;
+  return related
+    .sort((a, b) => b.score - a.score || nodeLabel(a.node).localeCompare(nodeLabel(b.node)))
+    .slice(0, 200);
+}
+
+function isCodeEvidenceNode(node: GraphNode): boolean {
+  return ![
+    "repository", "workspace", "directory", "team", "developer", "role",
+    "businessRule", "architectureDecision", "securityPolicy", "codingConvention",
+    "requirement", "specification", "complianceRule", "operationalRule",
+    "incidentLearning", "assumption", "domainRule", "externalConstraint",
+  ].includes(node.kind);
+}
+
+function evidenceFor(candidate: RelatedCandidate): BundleCodeEvidence {
+  const path = "path" in candidate.node && typeof candidate.node.path === "string" ? candidate.node.path : undefined;
+  return {
+    id: candidate.node.id,
+    label: nodeLabel(candidate.node),
+    ...(path !== undefined ? { path } : {}),
+    relation: candidate.relation,
+    direction: candidate.direction,
+    provenance: candidate.provenance,
+    score: candidate.score,
+    depth: candidate.depth,
+    selectionReason: `${candidate.direction} ${candidate.relation} relation at depth ${candidate.depth}; provenance=${candidate.provenance}; deterministic score=${candidate.score}`,
+  };
 }
 
 function guidance(contexts: ContextRecord[]): BundleGuidance[] {

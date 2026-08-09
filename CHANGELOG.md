@@ -6,6 +6,18 @@ All notable changes to NodeNet are documented here.
 
 ### Added
 
+- `nodenet open`: one-command loopback graph server with automatic browser
+  launch, repository watching, SSE hot reload, safe error retention, and
+  optional change-decision overlay.
+- Optional dependency-free 3D governance-map view with perspective depth,
+  drag rotation, Shift+drag panning, and 2D/3D switching.
+- Historical Decision Lab: authenticated GitHub PR/review metadata import,
+  isolated base/head replay without repository-code execution, blind local
+  labeling UI, evaluation reports, and configurable CI quality gates.
+- Verified override foundation: numeric GitHub actor derivation, explicit
+  claimed/verified assurance, default-deny repository/Context-scoped RBAC, and
+  Ed25519 signed-override generation/verification APIs.
+
 - Decision-quality benchmark datasets and metrics for reviewer precision and
   recall, false blocks, missed hardened impacts, outcome accuracy, and p50/p95
   latency.

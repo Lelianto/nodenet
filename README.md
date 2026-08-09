@@ -279,10 +279,15 @@ the full option reference.
 | `health` | Living context health report |
 | `report` | Deterministic highlights report: god nodes, surprising connections, communities, governance, suggested questions |
 | `graph [-o <file>] [-f html\|svg]` | Generate an interactive HTML viewer or static SVG image with communities |
+| `open [--change] [--base <ref>]` | Open the interactive graph in one command and hot-reload when repository files change |
 | `languages [--json]` | Show the ten-language support tier and capability matrix |
 | `changes --base <ref> --refs <refs...>` | Compare local branches for graph, context, and ownership collisions |
 | `bootstrap [--github]` | Create starter config, canonical LCDD policy, and optional GitHub workflow without overwriting files |
 | `benchmark --dataset <file>` | Measure reviewer precision/recall, false blocks, missed impacts, accuracy, and p50/p95 latency |
+| `eval import-github` | Import historical GitHub PR/review metadata into a private local dataset |
+| `eval run` | Replay NodeNet safely against exact historical base/head commits |
+| `eval label` | Open the loopback-only blind-labeling Decision Lab |
+| `eval report` / `eval gate` | Compare labels with replay decisions and enforce quality thresholds |
 | `doctor [--json]` | Report a 0–100 activation-readiness score with remediation steps |
 | `github pr [options]` | Analyze a PR; update an idempotent Check Run, comment, request reviewers, and audit the decision |
 | `mcp` | Run the MCP server over stdio for AI assistants |
@@ -398,6 +403,30 @@ nodenet github pr --repo owner/name --pr 42 --base main \
   `GITHUB_BASE_REF` are read automatically in Actions.
 - Design: [docs/adr/004-github-integration.md](docs/adr/004-github-integration.md).
 
+## Live graph and historical Decision Lab
+
+Open the governance graph without finding generated files manually:
+
+```bash
+nodenet open
+nodenet open --change --base main
+```
+
+NodeNet starts a loopback-only server, opens the browser, watches source and
+governance files, incrementally rebuilds, and sends hot-reload events. Use
+`--no-open` for terminal/remote workflows and `--port 7342` for a fixed port.
+The viewer defaults to the audit-friendly 2D map and includes a dependency-free
+**3D view** toggle. In 3D, drag to rotate, Shift+drag to pan, and scroll to zoom;
+use the on-canvas arrow pad to move the camera and its center button to reset
+the view. The keyboard arrow keys provide the same navigation, `Shift + Arrow`
+moves faster, and `Home` or `0` resets the camera. These shortcuts are disabled
+while typing in search. Switch back to 2D whenever labels and evidence paths
+are the priority.
+
+Historical evaluation can import GitHub PR metadata, replay exact commits in
+isolated temporary worktrees, blind-label results locally, and apply CI quality
+thresholds. See [historical decision evaluation](docs/evaluation.md).
+
 ## AI assistant integration (MCP)
 
 `nodenet mcp` runs a Model Context Protocol server over stdio, exposing the
@@ -478,6 +507,12 @@ See [SECURITY.md](SECURITY.md) and
   metrics, decision audit, and bounded overrides
 - [Design-partner pilot playbook](docs/design-partner-playbook.md) — staged
   rollout, weekly review, and validation gates
+- [Glossary](docs/glossary.md) — plain-language definitions for NodeNet, LCDD,
+  evaluation, identity, GitHub enforcement, and override terms
+- [Historical evaluation](docs/evaluation.md) — GitHub import, safe replay,
+  Decision Lab, metrics, and regression gates
+- [Verified overrides](docs/verified-overrides.md) — numeric GitHub identity,
+  RBAC scope, and signed override verification
 
 ## Testing
 

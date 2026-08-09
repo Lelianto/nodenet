@@ -10,8 +10,10 @@ coverage/
 **/.nodenet/index.json
 **/.nodenet/metadata.json
 **/.nodenet/symbols.json
+**/.nodenet/parse-cache.json
 **/.nodenet/audit.jsonl
 **/.nodenet/overrides.jsonl
+**/.nodenet/evaluation/
 **/.nodenet/suppressions.json
 test/fixtures/**/dist/
 

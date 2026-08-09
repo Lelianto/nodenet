@@ -31,6 +31,7 @@ import {
   upsertCheckRun,
 } from "./client.js";
 import { appendDecisionAudit, applyDecisionOverride, saveOverride, type DecisionOverride } from "../governance/audit.js";
+import { authorizeOverride, loadAccessPolicy } from "../identity/rbac.js";
 import {
   buildGovernanceDecision,
   type GovernanceDecision,
@@ -116,6 +117,12 @@ export async function runPrIntegration(
   const { impact, review, comment } = analyzed.value;
   let decision = analyzed.value.decision;
   if (opts.override) {
+    if (opts.override.verifiedActor) {
+      const policy = loadAccessPolicy(root);
+      if (!policy) return err(new Error("Verified GitHub overrides require .nodenet/access.json; authorization defaults to deny."));
+      const authorization = authorizeOverride(policy, opts.override.verifiedActor, opts.repo, analyzed.value.decision);
+      if (!authorization.allowed) return err(new Error(`Override denied: ${authorization.reason}.`));
+    }
     decision = applyDecisionOverride(decision, opts.override);
     saveOverride(root, opts.override);
   }

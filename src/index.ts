@@ -26,6 +26,8 @@ export { resolveReviewers } from "./review/resolver.js";
 export type { ReviewResolution, Reviewer } from "./review/resolver.js";
 export { computeSeverity } from "./review/severity.js";
 export type { Severity, SeverityInput } from "./review/severity.js";
+export { buildCriticalReview } from "./review/critical.js";
+export type { CriticalReview, CriticalReviewDecision, ReviewRisk, RiskPriority } from "./review/critical.js";
 
 export { computeHealth } from "./health/health.js";
 export type { HealthReport } from "./health/health.js";
@@ -41,7 +43,8 @@ export type {
 } from "./report/report.js";
 
 export { buildContextBundle } from "./ai/context-builder.js";
-export type { ContextBundle, BundleContextRef, BundleOwner, BundleGuidance } from "./ai/context-builder.js";
+export { estimateTokens, DEFAULT_CONTEXT_TOKEN_BUDGET, MIN_CONTEXT_TOKEN_BUDGET, MAX_CONTEXT_TOKEN_BUDGET } from "./ai/context-builder.js";
+export type { ContextBundle, ContextBundleMetrics, ContextBundleOptions, BundleContextRef, BundleOwner, BundleGuidance, BundleCodeEvidence } from "./ai/context-builder.js";
 
 export { loadContexts } from "./context/loader.js";
 export { transitionContext, applyDecay, canTransition, allTransitions } from "./context/lifecycle.js";
@@ -79,6 +82,20 @@ export { detectCommunities } from "./visualization/communities.js";
 export type { CommunityId } from "./visualization/communities.js";
 export { layoutGraph } from "./visualization/layout.js";
 export type { Point, LayoutOptions } from "./visualization/layout.js";
+export { startGraphDevServer } from "./visualization/dev-server.js";
+export type { GraphDevServer, GraphDevServerOptions } from "./visualization/dev-server.js";
+export { resolveGitHubIdentity } from "./identity/identity.js";
+export type { IdentityAssurance, VerifiedIdentity } from "./identity/identity.js";
+export { authorizeOverride, loadAccessPolicy, NODENET_ROLES } from "./identity/rbac.js";
+export type { AccessPolicy, NodeNetRole, RoleBinding } from "./identity/rbac.js";
+export { signOverride, verifySignedOverride } from "./identity/signed-override.js";
+export type { SignedOverride, SignedOverridePayload } from "./identity/signed-override.js";
+export { importGitHubHistory } from "./evaluation/github-import.js";
+export { loadDataset, loadEvaluationRun, loadLabels, saveDataset, saveEvaluationRun, saveLabel } from "./evaluation/store.js";
+export { replayDataset } from "./evaluation/replay.js";
+export { buildEvaluationReport, evaluationGate } from "./evaluation/report.js";
+export { startLabelServer } from "./evaluation/label-server.js";
+export type { EvaluationDataset, EvaluationLabel, EvaluationRun, EvaluationCaseRun, HistoricalPullRequest, FeedbackClass } from "./evaluation/types.js";
 
 export { safeRelativePath, resolveSafe, readFileSafe } from "./security/filesystem.js";
 export type { SafeRelativePath } from "./security/filesystem.js";
@@ -133,7 +150,7 @@ export {
 } from "./github/client.js";
 export type { GitHubClientConfig, GitHubComment, GitHubReviewRequest, GitHubCheckRun } from "./github/client.js";
 
-export { handleMcpLine, MCP_PROTOCOL_VERSION } from "./mcp/server.js";
+export { handleMcpLine, prepareMcpContext, MCP_PROTOCOL_VERSION } from "./mcp/server.js";
 export type { McpContext, McpTool } from "./mcp/server.js";
 
 export type { AnalysisState } from "./types/analysis-state.js";

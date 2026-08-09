@@ -45,8 +45,8 @@ import type { ContextRecord } from "../context/schema.js";
 import type { OwnershipIndex } from "../ownership/resolver.js";
 import type { ParsedSymbol, ParsedSymbolKind } from "../parser/typescript.js";
 import { runPrIntegration } from "../github/github.js";
-import { resolvePullNumber } from "../github/client.js";
-import { handleMcpLine, type McpContext } from "../mcp/server.js";
+import { resolveGitHubToken, resolvePullNumber } from "../github/client.js";
+import { handleMcpLine, prepareMcpContext } from "../mcp/server.js";
 import { buildReport, renderReportMarkdown } from "../report/report.js";
 import type { AnalysisState } from "../types/analysis-state.js";
 import { buildGovernanceDecision, isGovernanceMode, type GovernanceMode } from "../governance/decision.js";
@@ -56,10 +56,17 @@ import { AGENT_PLATFORMS, installAgentGuidance, uninstallAgentGuidance, type Age
 import { startMcpHttpServer } from "../mcp/http.js";
 import { analyzeChangeCollisions } from "../change/collisions.js";
 import { languageSupportMatrix } from "../parser/registry.js";
+import { startGraphDevServer } from "../visualization/dev-server.js";
 import { assessReadiness } from "../onboarding/readiness.js";
 import { bootstrapRepository } from "../onboarding/bootstrap.js";
 import { loadBenchmarkCases, scoreBenchmark } from "../evaluation/benchmark.js";
 import type { DecisionOverride } from "../governance/audit.js";
+import { resolveGitHubIdentity } from "../identity/identity.js";
+import { importGitHubHistory } from "../evaluation/github-import.js";
+import { loadDataset, loadEvaluationRun, loadLabels, saveDataset, saveEvaluationRun } from "../evaluation/store.js";
+import { replayDataset } from "../evaluation/replay.js";
+import { buildEvaluationReport, evaluationGate } from "../evaluation/report.js";
+import { startLabelServer } from "../evaluation/label-server.js";
 
 // ---------------------------------------------------------------------------
 // Shared plumbing
@@ -524,7 +531,8 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       .option("--propose <id>", "record a Context Change Proposal (does NOT modify active context)")
       .option("--migrate", "preview migration of legacy contexts to the LCDD 0.6 Registry")
       .option("--write", "write migration output (requires --migrate)")
-      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean }) => {
+      .option("--max-tokens <number>", "advanced: override the automatic AI context budget")
+      .action((target: string | undefined, cmdOptions: { json?: boolean; propose?: string; migrate?: boolean; write?: boolean; maxTokens?: string }) => {
         const config = loadConfigChecked(cwd);
         const state = loadForAnalysis(cwd, config);
         if (cmdOptions.write && !cmdOptions.migrate) {
@@ -588,7 +596,13 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
           if (state.contexts.length === 0) process.stdout.write("No living contexts declared.\n");
           return;
         }
-        const bundle = buildContextBundle(state.graph, state.index, state.ownership, state.contexts, target);
+        const requestedBudget = cmdOptions.maxTokens === undefined ? undefined : Number(cmdOptions.maxTokens);
+        if (requestedBudget !== undefined && (!Number.isFinite(requestedBudget) || requestedBudget <= 0)) {
+          throw new Error("--max-tokens must be a positive number.");
+        }
+        const bundle = buildContextBundle(state.graph, state.index, state.ownership, state.contexts, target, {
+          ...(requestedBudget !== undefined ? { maxTokens: requestedBudget } : {}),
+        });
         if (!bundle) {
           process.stdout.write(`No target matched "${target}". Try a symbol or file name.\n`);
           return;
@@ -845,6 +859,42 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       process.stdout.write(`Graph written to ${out}\n`);
     });
 
+  // -- open ------------------------------------------------------------------
+  program
+    .command("open")
+    .description("Open the interactive governance graph and hot-reload on repository changes")
+    .option("--no-open", "start the live server without opening a browser")
+    .option("--port <port>", "loopback port; 0 selects an available port", "0")
+    .option("--change", "overlay current change impact and governance decision")
+    .option("-b, --base <ref>", "git base ref used with --change")
+    .action(async (cmdOptions: { open?: boolean; port?: string; change?: boolean; base?: string }) => {
+      const port = Number(cmdOptions.port ?? "0");
+      if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Port must be an integer from 0 to 65535.");
+      const render = (): string => {
+        const config = loadConfigChecked(cwd);
+        const state = buildState(cwd, config);
+        let change: GovernanceMapOptions["change"];
+        if (cmdOptions.change) {
+          const impact = analyzeImpact(cwd, config, state.graph, state.index, state.ownership, state.contexts, {
+            ...(cmdOptions.base ? { base: cmdOptions.base } : {}),
+          });
+          if (!impact.ok) throw impact.error;
+          const review = resolveReviewers(cwd, config, impact.value);
+          change = {
+            decision: buildGovernanceDecision(impact.value, review, "warn"),
+            changedNodeIds: impact.value.changedSymbols.flatMap((symbol) => symbol.nodeId ? [symbol.nodeId] : []),
+            affectedNodeIds: impact.value.affectedNodeIds,
+          };
+        }
+        return renderGraphHtml(state.graph, { ...(change ? { change } : {}) });
+      };
+      const live = await startGraphDevServer({ root: cwd, port, openBrowser: cmdOptions.open !== false, render });
+      process.stdout.write(`NodeNet live graph: ${live.url}\nWatching for repository changes. Ctrl-C to stop.\n`);
+      const stop = (): void => { void live.close().finally(() => process.exit(0)); };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
+
   // -- changes ---------------------------------------------------------------
   program
     .command("changes")
@@ -916,6 +966,75 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       process.stdout.write(`latency p50/p95: ${metrics.p50Ms}ms / ${metrics.p95Ms}ms\n`);
     });
 
+  // -- eval -------------------------------------------------------------------
+  const evaluation = program.command("eval").description("Import, replay, label and evaluate historical pull requests");
+  evaluation
+    .command("import-github")
+    .description("Import historical GitHub pull-request metadata into a local dataset")
+    .requiredOption("--repo <owner/name>", "GitHub repository")
+    .option("--since <date>", "only include PRs updated on/after this ISO date")
+    .option("--limit <number>", "maximum pull requests", "100")
+    .option("--dataset <id>", "dataset identifier")
+    .option("--token <token>", "GitHub token (default GITHUB_TOKEN/GH_TOKEN)")
+    .action(async (cmdOptions: { repo: string; since?: string; limit?: string; dataset?: string; token?: string }) => {
+      const token = cmdOptions.token ?? resolveGitHubToken();
+      if (!token) throw new Error("GitHub authentication is required. Set GITHUB_TOKEN/GH_TOKEN or pass --token.");
+      const dataset = await importGitHubHistory({ repository: cmdOptions.repo, token, limit: Math.max(1, Number(cmdOptions.limit) || 100), ...(cmdOptions.since ? { since: cmdOptions.since } : {}), ...(cmdOptions.dataset ? { datasetId: cmdOptions.dataset } : {}) });
+      const file = saveDataset(cwd, dataset);
+      process.stdout.write(`Imported ${dataset.cases.length} pull requests into ${dataset.id}\n${file}\n`);
+    });
+  evaluation
+    .command("run")
+    .description("Replay NodeNet against historical base/head commits without executing repository code")
+    .requiredOption("--dataset <id>", "dataset identifier")
+    .option("--limit <number>", "maximum cases")
+    .action((cmdOptions: { dataset: string; limit?: string }) => {
+      const dataset = loadDataset(cwd, cmdOptions.dataset);
+      const run = replayDataset(cwd, dataset, { ...(cmdOptions.limit ? { limit: Math.max(1, Number(cmdOptions.limit) || 1) } : {}), onProgress: (done, total) => process.stdout.write(`replayed ${done}/${total}\n`) });
+      const file = saveEvaluationRun(cwd, run);
+      process.stdout.write(`Evaluation run ${run.id} written to ${file}\n`);
+    });
+  evaluation
+    .command("label")
+    .description("Open the local blind-labeling Decision Lab")
+    .requiredOption("--dataset <id>", "dataset identifier")
+    .option("--run <id>", "evaluation run to compare after revealing")
+    .option("--no-open", "do not open a browser")
+    .option("--port <port>", "loopback port; 0 selects an available port", "0")
+    .action(async (cmdOptions: { dataset: string; run?: string; open?: boolean; port?: string }) => {
+      const server = await startLabelServer({ root: cwd, dataset: loadDataset(cwd, cmdOptions.dataset), ...(cmdOptions.run ? { run: loadEvaluationRun(cwd, cmdOptions.run) } : {}), port: Number(cmdOptions.port ?? "0"), openBrowser: cmdOptions.open !== false });
+      process.stdout.write(`NodeNet Decision Lab: ${server.url}\nCtrl-C to stop.\n`);
+      const stop = (): void => { void server.close().finally(() => process.exit(0)); };
+      process.once("SIGINT", stop); process.once("SIGTERM", stop);
+    });
+  evaluation
+    .command("report")
+    .description("Compare replay output with human labels")
+    .requiredOption("--run <id>", "evaluation run identifier")
+    .option("--json", "emit machine-readable report")
+    .action((cmdOptions: { run: string; json?: boolean }) => {
+      const run = loadEvaluationRun(cwd, cmdOptions.run);
+      const report = buildEvaluationReport(run, loadLabels(cwd, run.datasetId));
+      if (cmdOptions.json) return printJson(report, true);
+      process.stdout.write(`evaluated: ${report.evaluated}/${report.labeled} labeled; errors: ${report.errors}\n`);
+      process.stdout.write(`precision ${report.metrics.reviewerPrecision} · recall ${report.metrics.reviewerRecall} · false blocks ${report.metrics.falseBlockRate} · missed hardened ${report.metrics.missedImpactRate} · p95 ${report.metrics.p95Ms}ms\n`);
+    });
+  evaluation
+    .command("gate")
+    .description("Fail when a labeled evaluation run misses quality thresholds")
+    .requiredOption("--run <id>", "evaluation run identifier")
+    .option("--min-precision <value>", "minimum reviewer precision", "0.8")
+    .option("--min-recall <value>", "minimum reviewer recall", "0.75")
+    .option("--max-false-block <value>", "maximum false-block rate", "0.05")
+    .option("--max-missed-hardened <value>", "maximum missed-hardened rate", "0")
+    .action((cmdOptions: { run: string; minPrecision: string; minRecall: string; maxFalseBlock: string; maxMissedHardened: string }) => {
+      const run = loadEvaluationRun(cwd, cmdOptions.run);
+      const report = buildEvaluationReport(run, loadLabels(cwd, run.datasetId));
+      const gate = evaluationGate(report, { minPrecision: Number(cmdOptions.minPrecision), minRecall: Number(cmdOptions.minRecall), maxFalseBlock: Number(cmdOptions.maxFalseBlock), maxMissedHardened: Number(cmdOptions.maxMissedHardened) });
+      process.stdout.write(gate.pass ? "Evaluation gate passed.\n" : `Evaluation gate failed:\n${gate.failures.map((item) => `  - ${item}`).join("\n")}\n`);
+      if (!gate.pass) commandExitCode = 2;
+    });
+
   // -- github pr --------------------------------------------------------------
   withJson(
     program
@@ -972,12 +1091,17 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
         const overrideValues = [cmdOptions.overrideDecision, cmdOptions.overrideActor, cmdOptions.overrideReason, cmdOptions.overrideExpires];
         if (overrideValues.some(Boolean)) {
           if (overrideValues.some((value) => !value)) throw new Error("Override requires --override-decision, --override-actor, --override-reason and --override-expires.");
+          const token = cmdOptions.token ?? process.env["GITHUB_TOKEN"] ?? process.env["GH_TOKEN"];
+          const verifiedActor = await resolveGitHubIdentity(token);
+          if (process.env["GITHUB_ACTIONS"] === "true" && !verifiedActor) throw new Error("Cannot verify the GitHub actor for this override.");
           override = {
             decisionId: cmdOptions.overrideDecision ?? "",
-            actor: cmdOptions.overrideActor ?? "",
+            actor: verifiedActor?.login ?? cmdOptions.overrideActor ?? "",
             reason: cmdOptions.overrideReason ?? "",
             createdAt: new Date().toISOString(),
             expiresAt: cmdOptions.overrideExpires ?? "",
+            identityAssurance: verifiedActor?.assurance ?? "claimed",
+            ...(verifiedActor ? { verifiedActor } : {}),
           };
         }
         const result = await runPrIntegration(cwd, config, state, {
@@ -1029,18 +1153,19 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
     .action(async () => {
       const config = loadConfigChecked(cwd);
       const state = loadForAnalysis(cwd, config) as AnalysisState;
-      const ctx: McpContext = { root: cwd, config, state };
+      const ctx = prepareMcpContext({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true });
       const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
       for await (const line of rl) {
         const response = handleMcpLine(ctx, line);
         if (response !== null) process.stdout.write(response + "\n");
+        if (ctx.protocolState?.shutdownRequested) break;
       }
     });
 
   // -- serve ------------------------------------------------------------------
   program
     .command("serve")
-    .description("Serve the MCP graph over local HTTP for multiple agents")
+    .description("EXPERIMENTAL: serve the MCP JSON-RPC bridge over local HTTP (not Streamable HTTP)")
     .option("--host <host>", "bind host; loopback is the safe default", "127.0.0.1")
     .option("--port <port>", "bind port", "7341")
     .option("--token <token>", "optional bearer token")
@@ -1053,12 +1178,12 @@ export async function runCli(argv: string[], opts: { cwd?: string } = {}): Promi
       if (host !== "127.0.0.1" && host !== "::1" && !cmdOptions.token) {
         throw new Error("A bearer token is required when binding beyond loopback.");
       }
-      const server = await startMcpHttpServer({ root: cwd, config, state }, {
+      const server = await startMcpHttpServer({ root: cwd, config, state, protocolState: { initialized: false, ready: false, shutdownRequested: false }, auditEnabled: true }, {
         host,
         port,
         ...(cmdOptions.token ? { token: cmdOptions.token } : {}),
       });
-      process.stdout.write(`NodeNet MCP listening at ${server.url}/mcp\n`);
+      process.stdout.write(`EXPERIMENTAL NodeNet MCP JSON-RPC bridge listening at ${server.url}/mcp (not MCP Streamable HTTP)\n`);
       await new Promise<void>((resolve) => {
         const stop = () => void server.close().then(resolve);
         process.once("SIGINT", stop);
@@ -1207,6 +1332,7 @@ function printReview(review: ReviewResolution, impact: ImpactReport): void {
 
 function printBundle(bundle: ContextBundle): void {
   process.stdout.write(`TARGET\n  ${bundle.target}\n`);
+  process.stdout.write(`  context budget: ~${bundle.metrics.estimatedTokens}/${bundle.metrics.budgetTokens} tokens${bundle.metrics.truncated ? " (truncated)" : ""}\n`);
   if (bundle.codeContext.length > 0) {
     process.stdout.write(`\nCODE CONTEXT\n`);
     for (const c of bundle.codeContext) process.stdout.write(`  ${c}\n`);

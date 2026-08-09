@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { GovernanceDecision } from "./decision.js";
 import { appendAudit, dotNodenetDir, ensureDotNodenet } from "../storage/storage.js";
+import type { IdentityAssurance, VerifiedIdentity } from "../identity/identity.js";
 
 export interface DecisionOverride {
   decisionId: string;
@@ -10,6 +11,8 @@ export interface DecisionOverride {
   reason: string;
   createdAt: string;
   expiresAt: string;
+  identityAssurance?: IdentityAssurance;
+  verifiedActor?: VerifiedIdentity;
 }
 
 export interface DecisionAuditInput {
@@ -62,6 +65,11 @@ export function appendDecisionAudit(root: string, input: DecisionAuditInput): vo
     ...(input.pullRequest ? { pullRequest: input.pullRequest } : {}),
     ...(input.override ? {
       overrideActor: input.override.actor,
+      identityAssurance: input.override.identityAssurance ?? "claimed",
+      ...(input.override.verifiedActor ? {
+        verifiedGithubUserId: input.override.verifiedActor.providerUserId,
+        verifiedGithubLogin: input.override.verifiedActor.login,
+      } : {}),
       overrideReason: input.override.reason,
       overrideExpiresAt: input.override.expiresAt,
     } : {}),

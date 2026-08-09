@@ -170,7 +170,9 @@ export function layoutGraph(
       const r = Math.hypot(p.x - cx, p.y - cy);
       if (r > maxR) maxR = r;
     }
-    const targetRadius = Math.max(60, 130 * Math.sqrt(m));
+    // Compact circular communities: enough separation for nodes without
+    // turning every cluster into a viewport-sized rectangle.
+    const targetRadius = Math.max(28, 18 * Math.sqrt(m) + 12);
     const scale = targetRadius / maxR;
     members.forEach((idx, pos) => {
       const p = positions[pos]!;
@@ -179,8 +181,10 @@ export function layoutGraph(
     void c;
   }
 
-  // 2. Community graph (pairwise edge counts become parallel edges).
-  const communityIds = [...byCommunity.keys()];
+  // 2. Community graph metadata.
+  const communityIds = [...byCommunity.keys()].sort((a, b) =>
+    (byCommunity.get(b)?.length ?? 0) - (byCommunity.get(a)?.length ?? 0) || a - b,
+  );
   const cIndex = new Map<CommunityId, number>();
   communityIds.forEach((c, i) => cIndex.set(c, i));
   const cEdges: [number, number][] = [];
@@ -195,18 +199,73 @@ export function layoutGraph(
     cEdges.push([a, b]);
   }
 
-  // 3. Layout community centers, then compose.
-  const centers: Point[] = communityIds.map(() => ({ x: 0, y: 0 }));
-  simulate(centers, cEdges, iterations, width, height);
+  // 3. Place cluster centers on a deterministic golden-angle spiral. This is
+  // intentionally an unbounded world rather than a clamped rectangular box.
+  // Cross-community connectivity slightly pulls related clusters together.
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const communitySpacing = Math.max(85, Math.min(width, height) * 0.13);
+  const centers: Point[] = communityIds.map((_community, i) => {
+    if (i === 0) return { x: 0, y: 0 };
+    const radius = communitySpacing * Math.sqrt(i);
+    const angle = i * golden;
+    return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+  });
+  const centerIterations = Math.max(50, Math.min(100, iterations + 20));
+  for (let iteration = 0; iteration < centerIterations; iteration++) {
+    const cooling = Math.max(0.08, (centerIterations - iteration) / centerIterations);
+    // Repulsion and collision keep clusters separate without snapping them to
+    // rings or viewport boundaries.
+    for (let a = 0; a < centers.length; a++) {
+      for (let b = a + 1; b < centers.length; b++) {
+        const pa = centers[a]!;
+        const pb = centers[b]!;
+        let dx = pb.x - pa.x;
+        let dy = pb.y - pa.y;
+        let distance = Math.hypot(dx, dy);
+        if (distance < 0.1) { dx = (b - a) * 0.01; dy = 0.01; distance = Math.hypot(dx, dy); }
+        const ra = 24 + 13 * Math.sqrt(byCommunity.get(communityIds[a]!)?.length ?? 1);
+        const rb = 24 + 13 * Math.sqrt(byCommunity.get(communityIds[b]!)?.length ?? 1);
+        const desired = ra + rb + 34;
+        const repulsion = (communitySpacing * communitySpacing / Math.max(distance * distance, 1)) * 0.7 * cooling;
+        const collision = distance < desired ? (desired - distance) * 0.08 * cooling : 0;
+        const force = Math.min(24, repulsion + collision);
+        const ux = dx / distance;
+        const uy = dy / distance;
+        pa.x -= ux * force; pa.y -= uy * force;
+        pb.x += ux * force; pb.y += uy * force;
+      }
+    }
+    // Connected communities attract each other.
+    for (const [a, b] of cEdges) {
+      const pa = centers[a]!;
+      const pb = centers[b]!;
+      const dx = pb.x - pa.x;
+      const dy = pb.y - pa.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const pull = Math.min(0.08, Math.max(0, distance - 190) * 0.0003 * cooling);
+      pa.x += dx * pull; pa.y += dy * pull;
+      pb.x -= dx * pull; pb.y -= dy * pull;
+    }
+    // Soft gravity prevents disconnected islands from drifting forever while
+    // preserving an unbounded, pannable world.
+    for (const center of centers) {
+      center.x *= 1 - 0.0025 * cooling;
+      center.y *= 1 - 0.0025 * cooling;
+      if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) {
+        center.x = 0;
+        center.y = 0;
+      }
+      center.x = Math.max(-8_000, Math.min(8_000, center.x));
+      center.y = Math.max(-8_000, Math.min(8_000, center.y));
+    }
+  }
 
   const result = new Map<NodeId, Point>();
   communityIds.forEach((c, ci) => {
     const center = centers[ci]!;
     for (const idx of byCommunity.get(c) ?? []) {
       const l = local.get(idx) ?? { x: 0, y: 0 };
-      const x = Math.min(width, Math.max(0, center.x + l.x));
-      const y = Math.min(height, Math.max(0, center.y + l.y));
-      result.set(nodes[idx]!.id, { x, y });
+      result.set(nodes[idx]!.id, { x: center.x + l.x, y: center.y + l.y });
     }
   });
   return result;

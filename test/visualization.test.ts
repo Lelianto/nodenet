@@ -52,16 +52,16 @@ describe("layoutGraph", () => {
     }
   });
 
-  it("places every node inside the viewport", () => {
+  it("places every node in a finite, unbounded graph world", () => {
     const graph = fixtureGraph();
     const communities = detectCommunities(graph);
     const positions = layoutGraph(graph, communities, { width: 1000, height: 700, iterations: 40 });
     expect(positions.size).toBe(graph.size);
     for (const [, p] of positions) {
-      expect(p.x).toBeGreaterThanOrEqual(0);
-      expect(p.x).toBeLessThanOrEqual(1000);
-      expect(p.y).toBeGreaterThanOrEqual(0);
-      expect(p.y).toBeLessThanOrEqual(700);
+      expect(Number.isFinite(p.x)).toBe(true);
+      expect(Number.isFinite(p.y)).toBe(true);
+      expect(Math.abs(p.x)).toBeLessThan(10_000);
+      expect(Math.abs(p.y)).toBeLessThan(10_000);
     }
   });
 
@@ -117,7 +117,54 @@ describe("renderGraphHtml", () => {
     expect(html).toContain('NodeNet Governance Map');
     expect(html).toContain('Evidence paths');
     expect(html).toContain('No change set loaded · use graph --change');
-    expect(html).toContain('n.x/DATA.width');
+    expect(html).toContain('r.width/2+n.x*scale');
+    expect(html).toContain('id="fit"');
+    expect(html).toContain('id="view-toggle"');
+    expect(html).toContain('view3d=false');
+    expect(html).toContain('n.gx*cy+n.gz*sy');
+    expect(html).toContain('pitch=drag.pitch+dy*.006');
+    expect(html).not.toContain('Math.max(-1.25');
+    expect(html).toContain('if(!view3d&&!pinned&&mode==="architecture"');
+    expect(html).toContain('function fitSphere()');
+    expect(html).toContain('Drag freely to rotate 360°');
+    expect(html).toContain('aria-label="Camera controls"');
+    expect(html).toContain('aria-label="Move view left"');
+    expect(html).toContain('data-reset-view');
+    expect(html).toContain('canvas.onwheel=function(e){e.preventDefault();scale=');
+    expect(html).toContain('Math.min(12,scale*');
+    expect(html).not.toContain('ox=mx-(mx-ox)');
+    expect(html).toContain('event.key==="ArrowUp"');
+    expect(html).toContain('event.shiftKey?140:70');
+    expect(html).toContain('target.tagName||"TEXTAREA"');
+    const payloadMatch = html.match(/var DATA = (.+);\nvar COLORS=/);
+    expect(payloadMatch).not.toBeNull();
+    const payload = JSON.parse(payloadMatch![1]!) as {
+      nodes: Array<{ gx: number; gy: number; gz: number }>;
+      islands: Array<{ id: string; name: string; count: number }>;
+    };
+    const radii = payload.nodes.map((node) => Math.hypot(node.gx, node.gy, node.gz));
+    expect(Math.min(...radii)).toBeLessThan(180);
+    expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(100);
+    expect(html).toContain('if(view3d){ctx.arc');
+    expect(html).toContain('function drawCommunityHalos(){if(view3d)return;');
+    expect(html).toContain('volumeGroup');
+    expect(html).toContain('showLabel=labelMode==="all"');
+    expect(html).toContain('id="edge-toggle"');
+    expect(html).toContain('if(!showEdges||!enabledEdges.has');
+    expect(html).toContain('!view3d&&!pinned&&mode==="architecture"&&n.layer!=="code"');
+    expect(payload.islands.map((island) => island.name)).toEqual(expect.arrayContaining([
+      "Runtime Code", "Structure", "Tests & Configuration", "Governance Context", "Ownership",
+    ]));
+    expect(html).toContain('data-scope="1"');
+    expect(html).toContain('data-scope="2"');
+    expect(html).toContain('id="minimap"');
+    expect(html).toContain('kind:function');
+    expect(html).toContain('prefers-reduced-motion');
+    for (const axis of ["gx", "gy", "gz"] as const) {
+      const values = payload.nodes.map((node) => node[axis]);
+      expect(Math.max(...values) - Math.min(...values)).toBeGreaterThan(100);
+      expect(Math.abs((Math.min(...values) + Math.max(...values)) / 2)).toBeLessThan(0.00001);
+    }
     // No raw closing script inside the embedded JSON.
     expect(html).not.toContain("</script>}"); // would indicate an unescaped </script> in DATA
     expect(html.indexOf("</script>")).toBeGreaterThan(0);

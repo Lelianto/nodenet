@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { handleMcpLine, MCP_PROTOCOL_VERSION, type McpContext } from "../src/mcp/server.js";
+import { handleMcpLine, MCP_PROTOCOL_VERSION, prepareMcpContext, type McpContext, type McpTool } from "../src/mcp/server.js";
+import { ok } from "../src/types/result.js";
+import { makeNodeId } from "../src/analyzer/code-graph.js";
+import { safeRelativePath } from "../src/security/filesystem.js";
 import { makeGitRepo, buildFixtureState, fixtureRoot, tmpDir, copyFixture } from "./helpers.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -52,7 +55,7 @@ describe("MCP server protocol", () => {
     const res = send(ctx, JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list" }));
     const tools = res?.result?.tools as { name: string }[];
     expect(tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "health", "graph", "report"]),
+      expect.arrayContaining(["query", "related", "trace", "context", "explain", "governed_by", "owner", "impact", "reviewers", "critical_review", "health", "graph", "report"]),
     );
   });
 
@@ -69,6 +72,68 @@ describe("MCP server protocol", () => {
   it("rejects unknown tools", () => {
     const res = call(ctx, 6, "nope");
     expect(res?.error?.code).toBe(-32602);
+  });
+
+  it("strictly validates JSON-RPC and advertised input schemas", () => {
+    const badVersion = send(ctx, JSON.stringify({ jsonrpc: "1.0", id: 7, method: "ping" }));
+    expect(badVersion?.error?.code).toBe(-32600);
+    expect(call(ctx, 8, "query", { name: "PaymentService", extra: true })?.result?.isError).toBe(true);
+    expect(call(ctx, 9, "context", { target: "PaymentService", maxTokens: 256.5 })?.result?.isError).toBe(true);
+    expect(call(ctx, 91, "context", { target: "PaymentService", maxTokens: 255 })?.result?.isError).toBe(true);
+    const arrayArgs = send(ctx, JSON.stringify({ jsonrpc: "2.0", id: 911, method: "tools/call", params: { name: "graph", arguments: [] } }));
+    expect(arrayArgs?.error?.code).toBe(-32602);
+    const extraParams = send(ctx, JSON.stringify({ jsonrpc: "2.0", id: 912, method: "tools/call", params: { name: "graph", arguments: {}, extra: true } }));
+    expect(extraParams?.error?.code).toBe(-32602);
+  });
+
+  it("fails closed when any tool result contains a secret", () => {
+    const tools: McpTool[] = [{
+      name: "unsafe",
+      description: "test",
+      inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
+      run: () => ok("token=ghp_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ"),
+    }];
+    const out = handleMcpLine(ctx, JSON.stringify({ jsonrpc: "2.0", id: 92, method: "tools/call", params: { name: "unsafe", arguments: {} } }), tools);
+    const res = JSON.parse(out!) as ResponseLike;
+    expect(res.result?.isError).toBe(true);
+    expect(toolText(res)).toMatch(/blocked/i);
+    expect(toolText(res)).not.toContain("ghp_");
+  });
+
+  it("applies configured secret patterns and structured evidence envelopes", () => {
+    const customCtx: McpContext = { ...ctx, config: { ...ctx.config, secretPatterns: [...ctx.config.secretPatterns, "INTERNAL-[0-9]{4}"] } };
+    const secretTool: McpTool = {
+      name: "custom-secret",
+      description: "test",
+      inputSchema: { type: "object", properties: {}, required: [], additionalProperties: false },
+      run: () => ok("INTERNAL-1234"),
+    };
+    const blocked = handleMcpLine(customCtx, JSON.stringify({ jsonrpc: "2.0", id: 913, method: "tools/call", params: { name: "custom-secret", arguments: {} } }), [secretTool]);
+    expect(toolText(JSON.parse(blocked!) as ResponseLike)).not.toContain("INTERNAL-1234");
+
+    const arrayTool: McpTool = { ...secretTool, name: "array", run: () => ok('[{"name":"evidence"}]') };
+    const arrayOut = handleMcpLine(ctx, JSON.stringify({ jsonrpc: "2.0", id: 914, method: "tools/call", params: { name: "array", arguments: {} } }), [arrayTool]);
+    const arrayRes = JSON.parse(arrayOut!) as ResponseLike;
+    expect(arrayRes.result?.structuredContent).toMatchObject({ schemaVersion: "1", trust: "untrusted_repository_evidence" });
+
+    const unsafeRegexCtx: McpContext = { ...ctx, config: { ...ctx.config, secretPatterns: ["(a+)+$"] } };
+    const unsafeRegexOut = handleMcpLine(unsafeRegexCtx, JSON.stringify({ jsonrpc: "2.0", id: 9141, method: "tools/call", params: { name: "array", arguments: {} } }), [arrayTool]);
+    expect((JSON.parse(unsafeRegexOut!) as ResponseLike).result?.isError).toBe(true);
+  });
+
+  it("enforces transport lifecycle transitions", () => {
+    const transportCtx: McpContext = {
+      ...ctx,
+      protocolState: { initialized: false, ready: false, shutdownRequested: false },
+    };
+    expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 915, method: "tools/list" }))?.error?.code).toBe(-32002);
+    const initialized = send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 916, method: "initialize", params: { protocolVersion: "2099-01-01" } }));
+    expect(initialized?.result?.protocolVersion).toBe(MCP_PROTOCOL_VERSION);
+    expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 917, method: "tools/list" }))?.error?.code).toBe(-32002);
+    expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }))).toBeNull();
+    expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 918, method: "tools/list" }))?.error).toBeUndefined();
+    expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 919, method: "shutdown" }))?.error).toBeUndefined();
+    expect(send(transportCtx, JSON.stringify({ jsonrpc: "2.0", id: 920, method: "tools/list" }))?.error?.code).toBe(-32000);
   });
 });
 
@@ -106,11 +171,32 @@ describe("MCP tools", () => {
       target: string;
       livingContext: { id: string }[];
       aiGuidance: { action: string }[];
+      codeEvidence: { id: string; relation: string; direction: string; provenance: string; score: number; depth: number; selectionReason: string }[];
+      recommendedFiles: string[];
       secretFlagged: boolean;
+      metrics: { estimatedTokens: number; budgetTokens: number; truncated: boolean };
     };
     expect(bundle.livingContext.map((c) => c.id)).toEqual(expect.arrayContaining(["PAYMENT-003", "SEC-009"]));
     expect(bundle.aiGuidance.length).toBeGreaterThan(0);
+    expect(bundle.codeEvidence.length).toBeGreaterThan(0);
+    expect(bundle.codeEvidence.every((entry) => entry.id && entry.relation && entry.direction && entry.provenance && entry.selectionReason && Number.isFinite(entry.score))).toBe(true);
+    expect(bundle.codeEvidence.some((entry) => entry.depth === 2)).toBe(true);
+    expect(bundle.recommendedFiles.length).toBeGreaterThan(0);
     expect(typeof bundle.secretFlagged).toBe("boolean");
+    expect(bundle.metrics.budgetTokens).toBe(2000);
+    expect(bundle.metrics.estimatedTokens).toBeGreaterThan(0);
+  });
+
+  it("context honors and reports a caller-supplied token budget", () => {
+    const res = call(ctx, 131, "context", { target: "createSettlement", maxTokens: 256 });
+    expect(res?.error).toBeUndefined();
+    const bundle = JSON.parse(toolText(res!)) as {
+      livingContext: { id: string }[];
+      metrics: { budgetTokens: number; selectedNodes: number; omittedNodes: number };
+    };
+    expect(bundle.metrics.budgetTokens).toBe(256);
+    expect(bundle.metrics.omittedNodes).toBeGreaterThanOrEqual(0);
+    expect(bundle.livingContext.map((c) => c.id)).toEqual(expect.arrayContaining(["PAYMENT-003", "SEC-009"]));
   });
 
   it("explain describes a node and its connections", () => {
@@ -164,6 +250,69 @@ describe("MCP tools", () => {
     expect(res?.result?.isError).toBe(true);
     expect(toolText(res!)).toMatch(/git/i);
   });
+
+  it("fails governance-sensitive retrieval when repository inputs become stale", () => {
+    const dir = tmpDir();
+    copyFixture("cross-team", dir);
+    const fresh = buildFixtureState(dir);
+    const freshCtx: McpContext = { root: dir, config: fresh.config, state: fresh };
+    const changed = path.join(dir, "src/payment/PaymentService.ts");
+    const future = new Date(Date.now() + 5_000);
+    fs.utimesSync(changed, future, future);
+    const res = call(freshCtx, 21, "context", { target: "PaymentService" });
+    expect(res?.result?.isError).toBe(true);
+    expect(toolText(res!)).toMatch(/stale analysis state/i);
+  });
+
+  it("detects governance edits with rolled-back mtimes and deleted inputs", () => {
+    const dir = tmpDir();
+    copyFixture("cross-team", dir);
+    const fresh = buildFixtureState(dir);
+    const freshCtx = prepareMcpContext({ root: dir, config: fresh.config, state: fresh });
+    const governance = path.join(dir, ".nodenet/context.json");
+    const before = fs.statSync(governance);
+    const original = fs.readFileSync(governance, "utf8");
+    fs.writeFileSync(governance, original.replace("Settlement Processing Rule", "Settlement Processing RulE"));
+    fs.utimesSync(governance, before.atime, before.mtime);
+    const changed = call(freshCtx, 22, "context", { target: "PaymentService" });
+    expect(changed?.result?.isError).toBe(true);
+    expect(toolText(changed!)).toMatch(/\.nodenet\/context\.json/i);
+
+    const sourceCtx = prepareMcpContext({ root: dir, config: fresh.config, state: fresh });
+    fs.unlinkSync(path.join(dir, "src/payment/SettlementSchema.ts"));
+    const deleted = call(sourceCtx, 23, "impact");
+    expect(deleted?.result?.isError).toBe(true);
+    expect(toolText(deleted!)).toMatch(/deleted/i);
+  });
+
+  it("rejects ambiguous targets across target-based public tools", () => {
+    const dir = tmpDir();
+    copyFixture("cross-team", dir);
+    const duplicate = buildFixtureState(dir);
+    const duplicatePath = safeRelativePath("src/other/PaymentService.ts");
+    if (!duplicatePath.ok) throw duplicatePath.error;
+    duplicate.graph.addNode({
+      kind: "file",
+      id: makeNodeId("file", duplicatePath.value),
+      name: "PaymentService.ts",
+      path: duplicatePath.value,
+      language: "typescript",
+      isTest: false,
+    });
+    const duplicateCtx: McpContext = { root: dir, config: duplicate.config, state: duplicate };
+    for (const [name, args] of [
+      ["related", { name: "PaymentService.ts" }],
+      ["context", { target: "PaymentService.ts" }],
+      ["explain", { name: "PaymentService.ts" }],
+      ["owner", { target: "PaymentService.ts" }],
+      ["governed_by", { target: "PaymentService.ts" }],
+      ["trace", { from: "PaymentService.ts", to: "CheckoutService" }],
+    ] as const) {
+      const res = call(duplicateCtx, 24, name, args);
+      expect(res?.result?.isError, name).toBe(true);
+      expect(toolText(res!), name).toContain("ambiguous_target");
+    }
+  });
 });
 
 describe("MCP impact over a real git PR", () => {
@@ -190,5 +339,21 @@ describe("MCP impact over a real git PR", () => {
     };
     expect(review.required.map((r) => r.target)).toContain("payment-team");
     expect(review.authorityRequired.map((r) => r.target)).toContain("finance-team");
+
+    const criticalRes = call(ctx, 32, "critical_review", { base: "main" });
+    expect(criticalRes?.result?.isError).toBeUndefined();
+    const critical = JSON.parse(toolText(criticalRes!)) as {
+      decision: string;
+      risks: { id: string; mitigation: string; evidence: string[] }[];
+      requiredReviewers: string[];
+      residualRisk: string;
+      limitations: string[];
+    };
+    expect(critical.decision).toBe("CAUTION");
+    expect(critical.risks.map((risk) => risk.id)).toContain("cross-team-boundary");
+    expect(critical.risks.every((risk) => risk.mitigation.length > 0 && risk.evidence.length > 0)).toBe(true);
+    expect(critical.requiredReviewers).toContain("payment-team");
+    expect(critical.residualRisk).toMatch(/runtime behavior/i);
+    expect(critical.limitations.length).toBeGreaterThan(0);
   });
 });

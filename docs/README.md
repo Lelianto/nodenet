@@ -19,6 +19,10 @@ This directory is the hub for all NodeNet documentation. Start with the
 | 10 | Supported languages and usage | [languages.md](languages.md) |
 | 11 | Decision benchmarks and audited overrides | [decision-quality.md](decision-quality.md) |
 | 12 | Design-partner pilot operation | [design-partner-playbook.md](design-partner-playbook.md) |
+| 13 | Plain-language product vocabulary | [glossary.md](glossary.md) |
+| 14 | Historical PR replay and Decision Lab | [evaluation.md](evaluation.md) |
+| 15 | Verified identity, RBAC, and signed overrides | [verified-overrides.md](verified-overrides.md) |
+| 16 | Token-efficient graph context and delivery plan | [token-efficient-context.md](token-efficient-context.md) |
 
 ## Concepts
 
@@ -42,6 +46,14 @@ Core mental model documents.
   decisions, audit events, and expiring emergency overrides.
 - [design-partner-playbook.md](design-partner-playbook.md) — four-week rollout,
   weekly metrics, and the paid-pilot gate for organization features.
+- [glossary.md](glossary.md) — plain-language definitions for NodeNet, LCDD,
+  evaluation, GitHub enforcement, identity, and override terminology.
+- [evaluation.md](evaluation.md) — import historical PR metadata, replay exact
+  commits safely, blind-label decisions, report metrics, and gate regressions.
+- [verified-overrides.md](verified-overrides.md) — claimed versus verified
+  actors, local RBAC policy, and signed override verification.
+- [token-efficient-context.md](token-efficient-context.md) — Graphify comparison,
+  budgeted MSC design, evaluation gates, and delivery roadmap.
 
 ## Architecture decision records
 
