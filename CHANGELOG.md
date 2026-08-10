@@ -4,6 +4,16 @@ All notable changes to NodeNet are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-10
+
+### Changed
+
+- Promoted the `0.6.0-beta.2` artifact to stable with **no feature changes**.
+  The wire contract is now locked: lean `ask --json` by default, progressive
+  `route`/`map`/`evidence`/`source` context profiles, MCP structured-only
+  transport with the `core` default preset, and `--compat v1` as the migration
+  bridge. See the [0.6.0-beta.2](#060-beta2--2026-08-09) release notes below.
+
 ## [0.6.0-beta.2] — 2026-08-09
 
 ### Added

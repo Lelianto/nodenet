@@ -1,6 +1,6 @@
 {
   "name": "@antihero/nodenet",
-  "version": "0.6.0-beta.2",
+  "version": "0.6.0",
   "description": "Governance-aware repository intelligence for AI agents: route changes, explain impact, and resolve the right reviewers. Deterministic and local-first.",
   "keywords": [
     "graph",
@@ -89,7 +89,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "beta"
+    "tag": "latest"
   },
   "scripts": {
     "clean": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",

@@ -234,7 +234,7 @@ confidence interval. See the [positioning](docs/product-positioning.md) and
 ## Install
 
 ```bash
-npm install -g @antihero/nodenet@beta
+npm install -g @antihero/nodenet
 ```
 
 Or from source:
